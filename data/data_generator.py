@@ -15,12 +15,14 @@ import os
 from PIL import Image
 import pdb
 import numpy as np
-from data_augmentor import DataAugmentor
+import sys
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+from data.data_augmentor import DataAugmentor
+
 
 '''
 TODO: implement video recording stored in the src folder (only during testing)
 [IMP] TODO: implement (multiple) controlled environment factors at once 
-TODO: implement randomized resetting of attribute features
 
 [DONE] TODO: change the observation space based on yaml file, or output all obs together 
 [DONE] TODO: variation between deterministic or stochastic actions
@@ -57,9 +59,10 @@ class DataGenerator(gym.Env):
     def __init__(self):
 
         # Parse yaml file parameters for data generator
-        configs = self.load_config('../configs/data_generator/config.yaml')
+        configs = self.load_config(os.path.join(os.path.dirname(__file__), '../configs/data_generator/config.yaml'))
         
         # Configs from the yaml file
+        self.observation_space = 
         self.observation_type = configs['observation_space']
         self.state_attributes = configs['state_attributes']
         self.reset_type = configs['reset_type']
