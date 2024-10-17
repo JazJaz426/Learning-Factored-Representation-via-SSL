@@ -14,8 +14,6 @@ class DataAugmentor():
             'random_greyscale': A.ToGray,
             'random_masking': A.CoarseDropout
         }
-
-
         transformations = list(transformation_types.keys())
         random.shuffle(transformations)
 

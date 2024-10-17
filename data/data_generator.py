@@ -62,7 +62,6 @@ class DataGenerator(gym.Env):
         configs = self.load_config(os.path.join(os.path.dirname(__file__), '../configs/data_generator/config.yaml'))
         
         # Configs from the yaml file
-        self.observation_space = 
         self.observation_type = configs['observation_space']
         self.state_attributes = configs['state_attributes']
         self.reset_type = configs['reset_type']
@@ -78,7 +77,7 @@ class DataGenerator(gym.Env):
 
         # Wrap the environment to enable stochastic actions
         if configs['deterministic_action'] is False:
-            self.env = StochasticActionWrapper(env= self.env, prob = configs['action_stochasticity'])
+            self.env = StochasticActionWrapper(env=self.env, prob=configs['action_stochasticity'])
 
         #Store the controlled factors array
         self.controlled_factors = configs['controlled_factors']

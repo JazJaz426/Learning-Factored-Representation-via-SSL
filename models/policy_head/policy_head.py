@@ -33,6 +33,7 @@ class PolicyHead:
         self.policy_name = self.select_policy()
         self.train_env = train_env
         self.eval_env = eval_env
+        pdb.set_trace()
         self.models = self.create_models(num_models=self.model_config['num_models'])
 
     def load_config(self, config_path):
@@ -52,6 +53,7 @@ class PolicyHead:
         for model_num in range(num_models):
             if self.algorithm == "PPO":
                 ppo_params = {k: v for k, v in self.model_config['ppo'].items() if v is not None}
+                pdb.set_trace()
                 models[model_num] = PPO(
                     policy=self.policy_name,
                     env=self.train_env,
@@ -134,6 +136,5 @@ class PolicyHead:
         pass
 
 if __name__ == '__main__':
-    pdb.set_trace()
     policy_head = PolicyHead(DataGenerator(), DataGenerator(), 'configs/models/config.yaml', 'configs/data_generator/config.yaml')
     policy_head.train_and_evaluate_policy(total_timestamps=10000)
