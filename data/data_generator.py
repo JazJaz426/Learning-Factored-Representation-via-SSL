@@ -88,7 +88,8 @@ class DataGenerator(gym.Env):
 
         #creating the observation space and actions space
         self.action_space = self.env.action_space
-        self.observation_space = self._create_observation_space()
+        
+        self.observation_space = self._create_observation_space(configs['state_attribute_types'])
 
         #creating other gym environment attributes
         self.spec = self.env.spec
@@ -99,14 +100,36 @@ class DataGenerator(gym.Env):
 
         
         
-    def _create_observation_space(self):
+    def _create_observation_space(self, state_attribute_types):
         #return the desired gym Spaces based on the observation space
 
         if self.observation_type == 'image':
             return self.env.observation_space
+
         elif self.observation_type == 'expert':
-            #NOTE: fix this shit Shreyas please!
-            return NotImplementedError('ERROR: to be done later')
+            
+            gym_space_params = {'boolean': (0, 1, int), 'coordinate_width': (0, self.env.grid.width, int), 'coordinate_height': (0, self.env.grid.height, int), 'agent_dir': (0, 3, int)}
+
+            relevant_state_variables = list(self._construct_state().keys())
+
+            min_values = np.array([]); max_values = np.array([])
+
+            for var in relevant_state_variables:
+                types = state_attribute_types[var]
+
+                for t in types:
+                    
+                    space_param = gym_space_params[t]
+
+                    min_values = np.append(min_values, space_param[0])
+                    max_values = np.append(max_values, space_param[1])
+            
+            
+            return gym.spaces.Box(low=min_values, high=max_values, dtype=int)
+
+
+
+
         elif self.observation_type == 'factored':
             raise NotImplementedError('ERROR: to be implemented after factored representation encoder')
 
