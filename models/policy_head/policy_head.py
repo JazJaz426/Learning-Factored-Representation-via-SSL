@@ -53,13 +53,13 @@ class PolicyHead:
         for model_num in range(num_models):
             if self.algorithm == "PPO":
                 ppo_params = {k: v for k, v in self.model_config['ppo'].items() if v is not None}
-                pdb.set_trace()
+                
                 models[model_num] = PPO(
                     policy=self.policy_name,
                     env=self.train_env,
                     seed=model_num,
                     **ppo_params,
-                    tensorboard_log=f"./{self.algorithm}_tensorboard/"
+                    tensorboard_log=f"./{self.algorithm}_seed{model_num}_tensorboard/"
                 )
             elif self.algorithm == "DQN":
                 dqn_params = {k: v for k, v in self.model_config['dqn'].items() if v is not None}
@@ -68,7 +68,7 @@ class PolicyHead:
                     env=self.train_env,
                     seed=model_num,
                     **dqn_params,
-                    tensorboard_log=f"./{self.algorithm}_tensorboard/"
+                    tensorboard_log=f"./{self.algorithm}_seed{model_num}_tensorboard/"
                 )
             elif self.algorithm == "A2C":
                 a2c_params = {k: v for k, v in self.model_config['a2c'].items() if v is not None}
@@ -77,7 +77,7 @@ class PolicyHead:
                     env=self.train_env,
                     seed=model_num,
                     **a2c_params,
-                    tensorboard_log=f"./{self.algorithm}_tensorboard/"
+                    tensorboard_log=f"./{self.algorithm}_seed{model_num}_tensorboard/"
                 )
             else:
                 raise ValueError(f"Unsupported RL algorithm: {self.algorithm}")
@@ -93,11 +93,15 @@ class PolicyHead:
             eval_rewards = []
 
             for seed, model in self.models.items():
-                new_logger = configure(f"./{self.algorithm}_tensorboard/model_{seed}", ["stdout", "tensorboard"])
-                model.set_logger(new_logger)
 
-                callback = RewardValueCallback()
-                model.learn(total_timesteps=train_interval, callback=callback)
+                #NOTE: potentially uncomment if needed
+                # new_logger = configure(f"./{self.algorithm}_tensorboard/model_{seed}", ["stdout", "tensorboard"])
+                # model.set_logger(new_logger)
+
+                # callback = RewardValueCallback()
+                # model.learn(total_timesteps=train_interval, callback=callback)
+                model.learn(total_timesteps=train_interval, progress_bar=True)
+                #TODO: model.save with save dir
 
                 train_reward = self.evaluate_policy(self.train_env, seed, train_interval)
                 train_rewards.append(train_reward)
