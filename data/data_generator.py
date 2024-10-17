@@ -101,14 +101,12 @@ class DataGenerator(gym.Env):
         self.np_random = self.env.np_random
 
 
-
-        
-        
     def _create_observation_space(self, state_attribute_types):
         #return the desired gym Spaces based on the observation space
 
         if self.observation_type == 'image':
-            return self.env.observation_space
+            frame = self.env.render()
+            return gym.spaces.Box(low=0, high=255, shape=frame.shape, dtype=np.uint8)
 
         elif self.observation_type == 'expert':
             
@@ -151,7 +149,7 @@ class DataGenerator(gym.Env):
         6 Done
         '''
 
-        (_, reward, terminated, _, info) = self.env.step(action)
+        (_, reward, terminated, truncated, info) = self.env.step(action)
         
 
         frame = self.env.render()
@@ -183,9 +181,9 @@ class DataGenerator(gym.Env):
         # if done:
         #     self.reset()
 
-        return observation, reward, terminated, info
+        return observation, reward, terminated, truncated, info
 
-    def reset(self):
+    def reset(self, seed=None):
         '''
         Inputs: None
 
@@ -194,7 +192,7 @@ class DataGenerator(gym.Env):
         - info: additional information from environment after resetting
         '''
         
-        self.env.reset()
+        __, info = self.env.reset(seed=seed)
 
         #in case reset requires new state to have controlled state factors -- implement those controls
         if self.reset_type == 'custom':
@@ -228,7 +226,7 @@ class DataGenerator(gym.Env):
 
         
         #NOTE: used to have info output 
-        return observation
+        return observation, info
     
     def _randomize_reset(self):
         raise NotImplementedError('ERROR: not implemented yet')
@@ -335,10 +333,11 @@ if __name__ == '__main__':
             
                 rand_action = data_generator.env.action_space.sample()
 
-            observation, reward, terminated, __, info = data_generator.step(rand_action)
+            observation, reward, terminated, truncated, info = data_generator.step(rand_action)
 
             print('Current State :', observation)
             print('Info: ', info['state_dict'])
+            print('Reward: ', reward)
 
             img = Image.fromarray(info['obs'])
 
@@ -349,5 +348,5 @@ if __name__ == '__main__':
             img.save(os.path.join(temp_dir, '{}_original.jpeg'.format(i)))
         
         pdb.set_trace()
-        data_generator.reset()
+        data_generator.reset(seed=j)
 
