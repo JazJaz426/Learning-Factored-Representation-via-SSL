@@ -1,10 +1,15 @@
-import gym_minigrid
-from gym_minigrid.wrappers import  FullyObsWrapper
-from gym_minigrid.wrappers import ImgObsWrapper
+# import gym_minigrid
+# from gym_minigrid.wrappers import  FullyObsWrapper
+# from gym_minigrid.wrappers import ImgObsWrapper
+
+from minigrid.minigrid_env import MiniGridEnv
+from minigrid.wrappers import ImgObsWrapper
+from minigrid.wrappers import FullyObsWrapper
 import yaml
 
-# import gymnasium
-import gym
+import gymnasium as gym
+# from gymnasium import Env
+# import gym
 import random
 import os
 from PIL import Image
@@ -81,11 +86,29 @@ class DataGenerator(gym.Env):
         #prepare the data augmentor instance 
         self.data_augmentor = DataAugmentor(configs['transformations'])
 
+        #creating the observation space and actions space
+        self.action_space = self.env.action_space
+        self.observation_space = self._create_observation_space()
+
+        #creating other gym environment attributes
+        self.spec = self.env.spec
+        self.metadata = self.env.metadata
+        self.np_random = self.env.np_random
+
 
 
         
         
+    def _create_observation_space(self):
+        #return the desired gym Spaces based on the observation space
 
+        if self.observation_type == 'image':
+            return self.env.observation_space
+        elif self.observation_type == 'expert':
+            #NOTE: fix this shit Shreyas please!
+            return NotImplementedError('ERROR: to be done later')
+        elif self.observation_type == 'factored':
+            raise NotImplementedError('ERROR: to be implemented after factored representation encoder')
 
 
     def step(self, action):
