@@ -15,12 +15,14 @@ import os
 from PIL import Image
 import pdb
 import numpy as np
-from data_augmentor import DataAugmentor
+import sys
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+from data.data_augmentor import DataAugmentor
+
 
 '''
 TODO: implement video recording stored in the src folder (only during testing)
 [IMP] TODO: implement (multiple) controlled environment factors at once 
-TODO: implement randomized resetting of attribute features
 
 [DONE] TODO: change the observation space based on yaml file, or output all obs together 
 [DONE] TODO: variation between deterministic or stochastic actions
@@ -56,8 +58,10 @@ class DataGenerator(gym.Env):
 
     def __init__(self):
 
+        super(DataGenerator, self).__init__()
+
         # Parse yaml file parameters for data generator
-        configs = self.load_config('../configs/data_generator/config.yaml')
+        configs = self.load_config(os.path.join(os.path.dirname(__file__), '../configs/data_generator/config.yaml'))
         
         # Configs from the yaml file
         self.observation_type = configs['observation_space']
@@ -75,7 +79,7 @@ class DataGenerator(gym.Env):
 
         # Wrap the environment to enable stochastic actions
         if configs['deterministic_action'] is False:
-            self.env = StochasticActionWrapper(env= self.env, prob = configs['action_stochasticity'])
+            self.env = StochasticActionWrapper(env=self.env, prob=configs['action_stochasticity'])
 
         #Store the controlled factors array
         self.controlled_factors = configs['controlled_factors']
@@ -179,7 +183,7 @@ class DataGenerator(gym.Env):
         # if done:
         #     self.reset()
 
-        return observation, reward, terminated, None, info
+        return observation, reward, terminated, info
 
     def reset(self):
         '''
@@ -223,8 +227,8 @@ class DataGenerator(gym.Env):
         observation = self._get_obs(image = frame, state = state, factored = factored)
 
         
-
-        return observation, info
+        #NOTE: used to have info output 
+        return observation
     
     def _randomize_reset(self):
         raise NotImplementedError('ERROR: not implemented yet')

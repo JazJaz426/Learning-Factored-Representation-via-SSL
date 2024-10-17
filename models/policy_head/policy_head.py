@@ -2,6 +2,12 @@ import yaml
 from stable_baselines3 import PPO, DQN, A2C
 from stable_baselines3.common.logger import configure
 import numpy as np
+import sys
+import os
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../..')))
+from data.data_generator import DataGenerator
+import pdb
+from stable_baselines3.common.callbacks import BaseCallback
 
 
 class RewardValueCallback(BaseCallback):
@@ -20,32 +26,34 @@ class RewardValueCallback(BaseCallback):
 
 class PolicyHead:
     def __init__(self, train_env, eval_env, model_config_path, data_config_path):
-        self.model_config = self.load_config(model_config_path)['policy_head']
-        self.data_config = self.load_config(data_config_path)
+        self.model_config = self.load_config(os.path.join(os.path.dirname(__file__), '../..', model_config_path))['policy_head']
+        self.data_config = self.load_config(os.path.join(os.path.dirname(__file__), '../..', data_config_path))
         self.algorithm = self.model_config['algorithm']
-        self.data_type = self.data_config['data_type']
+        self.data_type = self.data_config['observation_space']
         self.policy_name = self.select_policy()
         self.train_env = train_env
         self.eval_env = eval_env
-        self.models = self.create_models(num_models=self.data_config['num_models'])
+        pdb.set_trace()
+        self.models = self.create_models(num_models=self.model_config['num_models'])
 
     def load_config(self, config_path):
         with open(config_path, 'r') as file:
             return yaml.safe_load(file)
 
     def select_policy(self):
-        if self.data_type == "visual_observation":
+        if self.data_type == "image":
             return "CnnPolicy"
-        elif self.data_type in ["latent_vector", "expert"]:
+        elif self.data_type in ["factored", "expert"]:
             return "MlpPolicy"
         else:
             raise ValueError(f"Unsupported data type: {self.data_type}")
 
     def create_models(self, num_models: int = 3):
         models = {}
-        for model_num in num_models:
+        for model_num in range(num_models):
             if self.algorithm == "PPO":
                 ppo_params = {k: v for k, v in self.model_config['ppo'].items() if v is not None}
+                pdb.set_trace()
                 models[model_num] = PPO(
                     policy=self.policy_name,
                     env=self.train_env,
@@ -127,6 +135,6 @@ class PolicyHead:
     def tune_hyperparameter():
         pass
 
-# Example usage
-policy_head = PolicyHead('configs/models/config.yaml', 'configs/data_generator/config.yaml')
-policy_head.train_and_evaluate_policy(total_timestamps=10000)
+if __name__ == '__main__':
+    policy_head = PolicyHead(DataGenerator(), DataGenerator(), 'configs/models/config.yaml', 'configs/data_generator/config.yaml')
+    policy_head.train_and_evaluate_policy(total_timestamps=10000)

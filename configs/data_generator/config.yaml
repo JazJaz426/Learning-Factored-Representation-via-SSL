@@ -1,12 +1,12 @@
 environment_name: MiniGrid-DoorKey-16x16-v0 #options: [MiniGrid-DoorKey-16x16-v0, MiniGrid-FourRooms-v0, MiniGrid-LavaCrossingS11N5-v0, MiniGrid-LavaCrossingS9N3-v0]
-observation_space: expert #options: [image, expert, factored]
+observation_space: image #options: [image, expert, factored]
 max_steps: 200
 
 #options: [random_rotation: [max_degrees, p], random_scaling: scalar, random_masking: [num_holes (min, max), hole_height_range (min, max), hole_width_range (min, max), probability], random_greyscale: probability, random_horz_flip: probability, random_vert_flip: probability, random_color_jitter: [brightness (min, max), contrast (min, max), saturation (min, max), hue (min, max), prob]]
 transformations: {
-  random_rotation: {limit: 60, p: 1.0, border_mode: 1},
-  random_greyscale: {p: 1.0},
-  random_masking: { num_holes_range: [3,3], hole_height_range: [3,5], hole_width_range: [3,5], p: 0.0 }
+  # random_rotation: {limit: 60, p: 1.0, border_mode: 1},
+  # random_greyscale: {p: 1.0},
+  # random_masking: { num_holes_range: [3,3], hole_height_range: [3,5], hole_width_range: [3,5], p: 0.0 }
 }
 
 # 'random_rotation': A.Rotate(limit=transformation_types['random_rotation'][0], p=transformation_types['random_rotation'][1]),
@@ -23,7 +23,7 @@ state_attributes: [agent_pos, agent_dir, goal_pos, key_pos, door_pos, holding_ke
 state_attribute_types: {'agent_pos': ['coordinate_width', 'coordinate_height'], 'agent_dir':['agent_dir'], 'goal_pos':['coordinate_width', 'coordinate_height'], 'key_pos':['coordinate_width', 'coordinate_height'], 'door_pos':['coordinate_width', 'coordinate_height'], 'holding_key': ['boolean'], 'door_locked':['boolean'], 'door_open':['boolean']}
 
 #options: [default, random, custom]
-reset_type: custom
+reset_type: default
 
 
 #options: [agent_pos: [x,y], agent_dir: [int], goal_pos: [x,y], key_pos: [x,y], door_pos: [x,y], holding_key: true/false, door_locked: true/false, door_open: true/false]
