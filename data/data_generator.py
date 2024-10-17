@@ -58,6 +58,8 @@ class DataGenerator(gym.Env):
 
     def __init__(self):
 
+        super(DataGenerator, self).__init__()
+
         # Parse yaml file parameters for data generator
         configs = self.load_config(os.path.join(os.path.dirname(__file__), '../configs/data_generator/config.yaml'))
         
@@ -181,7 +183,7 @@ class DataGenerator(gym.Env):
         # if done:
         #     self.reset()
 
-        return observation, reward, terminated, None, info
+        return observation, reward, terminated, info
 
     def reset(self):
         '''
@@ -225,8 +227,8 @@ class DataGenerator(gym.Env):
         observation = self._get_obs(image = frame, state = state, factored = factored)
 
         
-
-        return observation, info
+        #NOTE: used to have info output 
+        return observation
     
     def _randomize_reset(self):
         raise NotImplementedError('ERROR: not implemented yet')
