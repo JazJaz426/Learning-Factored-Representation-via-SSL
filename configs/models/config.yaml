@@ -1,1 +1,45 @@
+policy_head:
+  algorithm: "PPO"  # Options: DQN, PPO, A2C
+  num_models: 3
+  train_interval: 10
+  eval_interval: 1
 
+  ppo:
+    n_steps: 2048
+    learning_rate: 0.0003
+    batch_size: 64
+    gamma: 0.99
+    gae_lambda: 0.95
+    clip_range: 0.2
+    clip_range_vf: null
+    normalize_advantage: True
+    ent_coef: 0.01
+    max_grad_norm: 0.5
+    target_kl: null
+    verbose: null
+    gae_lambda: null
+    seed: null
+
+  dqn:
+    buffer_size: 10000
+    learning_starts: 1000
+    batch_size: 64
+    learning_rate: 0.0003
+    gamma: 0.99
+    train_freq: 4
+    exploration_fraction: 0.1
+    max_grad_norm: 10
+    seed: null
+
+  a2c:
+    learning_rate: 0.0003
+    n_steps: 5
+    gamma: 0.99
+    ent_coef: 0.01
+    vf_coef: 0.5
+    max_grad_norm: 0.5
+    rms_prop_eps: 1e-5
+    gae_lambda: 0.95
+    normalize_advantage: True
+    verbose: null
+    seed: null

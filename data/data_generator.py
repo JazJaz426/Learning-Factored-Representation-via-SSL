@@ -1,21 +1,28 @@
-import gym_minigrid
-from gym_minigrid.wrappers import  FullyObsWrapper
-from gym_minigrid.wrappers import ImgObsWrapper
+# import gym_minigrid
+# from gym_minigrid.wrappers import  FullyObsWrapper
+# from gym_minigrid.wrappers import ImgObsWrapper
+
+from minigrid.minigrid_env import MiniGridEnv
+from minigrid.wrappers import ImgObsWrapper
+from minigrid.wrappers import FullyObsWrapper
 import yaml
 
-# import gymnasium
-import gym
+import gymnasium as gym
+# from gymnasium import Env
+# import gym
 import random
 import os
 from PIL import Image
 import pdb
 import numpy as np
-from data_augmentor import DataAugmentor
+import sys
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+from data.data_augmentor import DataAugmentor
+
 
 '''
 TODO: implement video recording stored in the src folder (only during testing)
 [IMP] TODO: implement (multiple) controlled environment factors at once 
-TODO: implement randomized resetting of attribute features
 
 [DONE] TODO: change the observation space based on yaml file, or output all obs together 
 [DONE] TODO: variation between deterministic or stochastic actions
@@ -51,8 +58,10 @@ class DataGenerator(gym.Env):
 
     def __init__(self):
 
+        super(DataGenerator, self).__init__()
+
         # Parse yaml file parameters for data generator
-        configs = self.load_config('../configs/data_generator/config.yaml')
+        configs = self.load_config(os.path.join(os.path.dirname(__file__), '../configs/data_generator/config.yaml'))
         
         # Configs from the yaml file
         self.observation_type = configs['observation_space']
@@ -70,7 +79,7 @@ class DataGenerator(gym.Env):
 
         # Wrap the environment to enable stochastic actions
         if configs['deterministic_action'] is False:
-            self.env = StochasticActionWrapper(env= self.env, prob = configs['action_stochasticity'])
+            self.env = StochasticActionWrapper(env=self.env, prob=configs['action_stochasticity'])
 
         #Store the controlled factors array
         self.controlled_factors = configs['controlled_factors']
@@ -81,11 +90,50 @@ class DataGenerator(gym.Env):
         #prepare the data augmentor instance 
         self.data_augmentor = DataAugmentor(configs['transformations'])
 
-
-
+        #creating the observation space and actions space
+        self.action_space = self.env.action_space
         
-        
+        self.observation_space = self._create_observation_space(configs['state_attribute_types'])
 
+        #creating other gym environment attributes
+        self.spec = self.env.spec
+        self.metadata = self.env.metadata
+        self.np_random = self.env.np_random
+
+
+    def _create_observation_space(self, state_attribute_types):
+        #return the desired gym Spaces based on the observation space
+
+        if self.observation_type == 'image':
+            frame = self.env.render()
+            return gym.spaces.Box(low=0, high=255, shape=frame.shape, dtype=np.uint8)
+
+        elif self.observation_type == 'expert':
+            
+            gym_space_params = {'boolean': (0, 1, int), 'coordinate_width': (0, self.env.grid.width, int), 'coordinate_height': (0, self.env.grid.height, int), 'agent_dir': (0, 3, int)}
+
+            relevant_state_variables = list(self._construct_state().keys())
+
+            min_values = np.array([]); max_values = np.array([])
+
+            for var in relevant_state_variables:
+                types = state_attribute_types[var]
+
+                for t in types:
+                    
+                    space_param = gym_space_params[t]
+
+                    min_values = np.append(min_values, space_param[0])
+                    max_values = np.append(max_values, space_param[1])
+            
+            
+            return gym.spaces.Box(low=min_values, high=max_values, dtype=int)
+
+
+
+
+        elif self.observation_type == 'factored':
+            raise NotImplementedError('ERROR: to be implemented after factored representation encoder')
 
 
     def step(self, action):
@@ -101,7 +149,7 @@ class DataGenerator(gym.Env):
         6 Done
         '''
 
-        (_, reward, terminated, _, info) = self.env.step(action)
+        (_, reward, terminated, truncated, info) = self.env.step(action)
         
 
         frame = self.env.render()
@@ -133,9 +181,9 @@ class DataGenerator(gym.Env):
         # if done:
         #     self.reset()
 
-        return observation, reward, terminated, None, info
+        return observation, reward, terminated, truncated, info
 
-    def reset(self):
+    def reset(self, seed=None):
         '''
         Inputs: None
 
@@ -144,7 +192,7 @@ class DataGenerator(gym.Env):
         - info: additional information from environment after resetting
         '''
         
-        self.env.reset()
+        __, info = self.env.reset(seed=seed)
 
         #in case reset requires new state to have controlled state factors -- implement those controls
         if self.reset_type == 'custom':
@@ -177,7 +225,7 @@ class DataGenerator(gym.Env):
         observation = self._get_obs(image = frame, state = state, factored = factored)
 
         
-
+        #NOTE: used to have info output 
         return observation, info
     
     def _randomize_reset(self):
@@ -285,10 +333,11 @@ if __name__ == '__main__':
             
                 rand_action = data_generator.env.action_space.sample()
 
-            observation, reward, terminated, __, info = data_generator.step(rand_action)
+            observation, reward, terminated, truncated, info = data_generator.step(rand_action)
 
             print('Current State :', observation)
             print('Info: ', info['state_dict'])
+            print('Reward: ', reward)
 
             img = Image.fromarray(info['obs'])
 
@@ -299,5 +348,5 @@ if __name__ == '__main__':
             img.save(os.path.join(temp_dir, '{}_original.jpeg'.format(i)))
         
         pdb.set_trace()
-        data_generator.reset()
+        data_generator.reset(seed=j)
 
