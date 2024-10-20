@@ -18,15 +18,18 @@ import numpy as np
 import sys
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 from data.data_augmentor import DataAugmentor
+from data.utils.controlled_reset import CustomEnvReset
 
 
 '''
 TODO: implement video recording stored in the src folder (only during testing)
-[IMP] TODO: implement (multiple) controlled environment factors at once 
+
 
 [DONE] TODO: change the observation space based on yaml file, or output all obs together 
 [DONE] TODO: variation between deterministic or stochastic actions
 [DONE] TODO: implement (multiple) visual transformation on the observation output
+[DONE] TODO: implement (multiple) controlled environment factors at once 
+    - Random bug sometimes does not allow for factored expert state to be retrieved 
 '''
 class StochasticActionWrapper(gym.ActionWrapper):
     """
@@ -84,6 +87,9 @@ class DataGenerator(gym.Env):
         #Store the controlled factors array
         self.controlled_factors = configs['controlled_factors']
 
+        #storing the custom reset function if needed
+        self.custom_resetter = CustomEnvReset(configs['environment_name'])
+
         # Reset the environment to initialize it
         self.env.reset()
         
@@ -94,6 +100,7 @@ class DataGenerator(gym.Env):
         self.action_space = self.env.action_space
         
         self.observation_space = self._create_observation_space(configs['state_attribute_types'])
+
 
         #creating other gym environment attributes
         self.spec = self.env.spec
@@ -148,7 +155,6 @@ class DataGenerator(gym.Env):
         5 Toggle/activate an object
         6 Done
         '''
-
         (_, reward, terminated, truncated, info) = self.env.step(action)
         
 
@@ -196,7 +202,7 @@ class DataGenerator(gym.Env):
 
         #in case reset requires new state to have controlled state factors -- implement those controls
         if self.reset_type == 'custom':
-            self._control_factors()
+            self.env = self.custom_resetter.factored_reset(self.env, self.env.unwrapped.grid.height, self.env.unwrapped.grid.width, self.controlled_factors)
         elif self.reset_type == 'random':
             self._randomize_reset()
         
@@ -225,39 +231,16 @@ class DataGenerator(gym.Env):
         observation = self._get_obs(image = frame, state = state, factored = factored)
 
         
-        #NOTE: used to have info output 
+        
         return observation, info
     
     def _randomize_reset(self):
         raise NotImplementedError('ERROR: not implemented yet')
 
-    def _control_factors(self):
-        #fix each of the controlled factors using the unwrapped state variable
+    
 
 
-        #extract the types of all tiles in the grid: useful for goal, key and door position
-        types = np.array([x.type if x is not None else None for x in self.env.unwrapped.grid.grid])
-
-        for factor in self.controlled_factors.keys():
-
-            if factor == 'agent_pos':
-                self.env.unwrapped.place_agent(top = self.controlled_factors[factor], size=(1,1))
-            elif factor == 'agent_dir':
-                None
-            elif factor == 'goal_pos':
-                self.env.unwrapped.place_obj(obj = self.env.unwrapped.grid.grid[np.where(types=='goal')[0][0]], top=self.controlled_factors[factor], size=(1,1))
-            
-            elif ('key' in types) and (factor == 'key_pos'):
-                self.env.unwrapped.place_obj(obj = self.env.unwrapped.grid.grid[np.where(types=='key')[0][0]], top=self.controlled_factors[factor], size=(1,1))
-            elif ('door' in types) and (factor == 'door_pos'):
-                self.env.unwrapped.place_obj(obj = self.env.unwrapped.grid.grid[np.where(types=='door')[0][0]], top=self.controlled_factors[factor], size=(1,1))
-
-            elif ('key' in types) and (factor == 'holding_key'):
-                None
-            elif ('door' in types) and (factor == 'door_locked'):
-                None
-            elif ('door' in types) and (factor == 'door_open'):
-                None
+        
             
         
 
@@ -325,6 +308,11 @@ if __name__ == '__main__':
     os.makedirs(temp_dir, exist_ok=True)
 
     for j in range(3):
+        # pdb.set_trace()
+        obs, info = data_generator.reset(seed=j)
+        img = Image.fromarray(info['obs'])
+        img.save(os.path.join(temp_dir, 'reset_test.jpeg'))
+
         for i in range(MAX_STEPS):
 
             rand_action = 6
@@ -343,10 +331,9 @@ if __name__ == '__main__':
 
             img.save(os.path.join(temp_dir, '{}_modified.jpeg'.format(i)))
 
-            img = Image.fromarray(info['original_obs'])
+            # img = Image.fromarray(info['original_obs'])
 
-            img.save(os.path.join(temp_dir, '{}_original.jpeg'.format(i)))
+            # img.save(os.path.join(temp_dir, '{}_original.jpeg'.format(i)))
         
-        pdb.set_trace()
-        data_generator.reset(seed=j)
+        
 
