@@ -142,6 +142,9 @@ class DataGenerator(gym.Env):
         elif self.observation_type == 'factored':
             raise NotImplementedError('ERROR: to be implemented after factored representation encoder')
 
+    def render(self):
+        '''Implementing render() according to ABC of gymnasium env'''
+        return self.env.render()
 
     def step(self, action):
         '''
@@ -234,10 +237,7 @@ class DataGenerator(gym.Env):
         
         return observation, info
     
-    def _randomize_reset(self):
-        raise NotImplementedError('ERROR: not implemented yet')
 
-    
 
 
         
