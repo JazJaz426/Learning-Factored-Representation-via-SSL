@@ -59,12 +59,12 @@ class DataGenerator(gym.Env):
             config = yaml.safe_load(file)
         return config
 
-    def __init__(self):
+    def __init__(self, config_filename='config.yaml'):
 
         super(DataGenerator, self).__init__()
 
         # Parse yaml file parameters for data generator
-        configs = self.load_config(os.path.join(os.path.dirname(__file__), '../configs/data_generator/config.yaml'))
+        configs = self.load_config(os.path.join(os.path.dirname(__file__), f'../configs/data_generator/{config_filename}'))
         
         # Configs from the yaml file
         self.observation_type = configs['observation_space']
@@ -144,7 +144,9 @@ class DataGenerator(gym.Env):
 
     def render(self):
         '''Implementing render() according to ABC of gymnasium env'''
-        return self.env.render()
+        frame = self.env.render()
+        frame = self.data_augmentor.apply_transformation(frame)
+        return frame
 
     def step(self, action):
         '''
