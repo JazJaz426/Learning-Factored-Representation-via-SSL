@@ -1,5 +1,5 @@
 policy_head:
-  algorithm: "PPO"  # Options: DQN, PPO, A2C
+  algorithm: "DQN"  # Options: DQN, PPO, A2C
   num_models: 3
   train_interval: 10
   eval_interval: 1
@@ -20,16 +20,18 @@ policy_head:
     gae_lambda: null
     seed: null
 
-  dqn:
-    buffer_size: 10000
+ dqn:
+    buffer_size: 100
     learning_starts: 1000
-    batch_size: 64
+    batch_size: 32
     learning_rate: 0.0003
     gamma: 0.99
-    train_freq: 4
-    exploration_fraction: 0.1
+    train_freq: 100
+    exploration_fraction: 0.05
     max_grad_norm: 10
+    optimize_memory_usage: True
     seed: null
+    verbose: null
 
   a2c:
     learning_rate: 0.0003
