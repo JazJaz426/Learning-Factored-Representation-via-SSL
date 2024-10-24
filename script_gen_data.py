@@ -4,6 +4,7 @@ import torch
 
 from tqdm import tqdm
 import numpy as np
+import copy
 
 action_list = ["left","right","forward","pickup","drop","activate","done"]
 
@@ -130,19 +131,22 @@ class GenerateDataset:
             self._set_data_generator_reset_type("custom")
             self._set_data_generator_control_attr({})
             init_obs, init_info = self._get_reset_data_generator()
+            temp_data_generator = self._get_copy_data_generator()
 
             # Assume do random policy
             action = self._get_data_generator_random_action()
             obs, _, _, _, info = self._get_step_data_generator(action)
 
-            self._set_data_generator_reset_type("custom")
-            self._set_data_generator_control_attr(init_info["state_dict"])
-            _, _ = self._get_reset_data_generator()
+            #self._set_data_generator_reset_type("custom")
+            #self._set_data_generator_control_attr(init_info["state_dict"])
+            #init_obs1, _ = self._get_reset_data_generator()
 
-            action_prime = self._get_data_generator_random_action()
+            # action_prime = self._get_data_generator_random_action()
+            action_prime = temp_data_generator.action_space.sample()
             while action_prime == action:
-                action_prime = self._get_data_generator_random_action()
-            obs_prime, _, _, _, info_prime = self._get_step_data_generator(action_prime)
+                # action_prime = self._get_data_generator_random_action()
+                action_prime = temp_data_generator.action_space.sample()
+            obs_prime, _, _, _, info_prime = temp_data_generator.step(action_prime)
 
             self._save_obs_triplets(init_obs, obs, obs_prime, action, action_prime, obs_triplets_idx_path,
                                     init_state_dict=init_info["state_dict"], 
@@ -156,6 +160,9 @@ class GenerateDataset:
 
     def _get_reset_data_generator(self):
         return self.data_generator.reset()
+
+    def _get_copy_data_generator(self):
+        return copy.deepcopy(self.data_generator)
 
     def _set_data_generator_control_attr(self, control_attr_dict):
         self.data_generator.controlled_factors = control_attr_dict

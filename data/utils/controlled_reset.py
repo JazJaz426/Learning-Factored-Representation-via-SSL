@@ -47,7 +47,6 @@ class CustomEnvReset:
             while (splitIdx, doorIdx) in used_locations or (splitIdx is None or doorIdx is None) or (goal_pos[0]==splitIdx):
                 splitIdx = env.unwrapped._rand_int(2, width - 2)
                 doorIdx = env.unwrapped._rand_int(1, height - 2)
-        used_locations.add([splitIdx, doorIdx])
         
         # factor 3: control door locked / unlocked
         # factor 4: control door open/closed
@@ -77,9 +76,11 @@ class CustomEnvReset:
         else:
             if 'holding_key' in controlled_factors and controlled_factors['holding_key'] == 1:
                 #need to set the agent property as holding key
+                holding_key = 1
                 env.unwrapped.carrying = Key("yellow")
             else:
                 if 'holding_key' in controlled_factors and controlled_factors['holding_key'] == 0:  
+                    holding_key = 0
                     if 'key_pos' in controlled_factors:
                         key_top = controlled_factors['key_pos'] 
                         key_size = (1,1) 
@@ -107,7 +108,7 @@ class CustomEnvReset:
         agent_top = tuple(controlled_factors['agent_pos']) if 'agent_pos' in controlled_factors else (0,0)
         agent_size = (1,1) if 'agent_pos' in controlled_factors else (splitIdx, height)
         env.unwrapped.place_agent(top=agent_top, size=agent_size, max_tries=10)
-        
+
         #factor 8: control agent direction 
         if 'agent_dir' in controlled_factors:
             env.unwrapped.agent_dir = controlled_factors['agent_dir']
