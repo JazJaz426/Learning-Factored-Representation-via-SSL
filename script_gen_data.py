@@ -37,18 +37,18 @@ class GenerateDataset:
             episode_dict = {"obs":[], "info":[], "action":[], "reward":[]}
             done = False
             steps = 0
-            obs, info = self.data_generator.reset()
+            obs, info = self._get_reset_data_generator()
             episode_dict["obs"].append(obs)   # obs:  image, expert, or factored
             episode_dict["info"].append(info) # info: everything, regard as learning target for obs
 
             while not done and steps<self.episode_max_length:
                 if do_random_policy:
-                    action = self.data_generator.action_space.sample()
+                    action = self._get_data_generator_random_action()
                 else:
                     obs_tensor = torch.tensor(obs, dtype=torch.float32).unsqueeze(0)
                     logits = policy(obs_tensor)
                     action = torch.distributions.Categorical(logits=logits).sample()
-                obs, reward, done, _, info = data_generator.step(action)
+                obs, reward, done, _, info = self._get_step_data_generator(action)
                 episode_dict["obs"].append(obs)
                 episode_dict["info"].append(info)
                 episode_dict["action"].append(action)
@@ -80,21 +80,84 @@ class GenerateDataset:
                 self._save_func[f"episode_{feature}"](samples[i][feature], save_path)
 
     # pair (o,o',factor_k)
-    def sample_obs_pairs(self, num_pairs):
+    def sample_obs_pairs(self, num_pairs_per_control_attr):
         print("  Sampling observation pairs...")
         #options: [agent_pos: [x,y], agent_dir: [int], goal_pos: [x,y], key_pos: [x,y], door_pos: [x,y], holding_key: true/false, door_locked: true/false, door_open: true/false]
         #agent_dir: 0 - right, 1 - down, 2 - left, 3 - up
-        print("state_attributes", self.data_generator.state_attributes)
 
-        for control_attributes in self.data_generator.state_attributes:
-            for j in range(num_pairs):
-                continue
+        obs_pairs_root_path = os.path.join(self.dataset_root_path, "obs_pairs")
+        if not os.path.exists(obs_pairs_root_path):
+            os.makedirs(obs_pairs_root_path)
 
-        
+        self._set_data_generator_reset_type("custom")
+
+        for control_attr in self._get_data_generator_state_attr():
+            control_attr_save_path = os.path.join(obs_pairs_root_path, control_attr)
+            if not os.path.exists(control_attr_save_path):
+                os.makedirs(control_attr_save_path)
+            
+            i=0
+            while i < num_pairs_per_control_attr:
+                control_attr_sample = self._gen_rand_control_attr(control_attr)
+                self._set_data_generator_control_attr(control_attr, control_attr_sample)
+                try:
+                    obs0, info0 = self._get_reset_data_generator()
+                except RecursionError as e:
+                    print(f"RecursionError occurred: {e}")
+                    continue
+                try:
+                    obs1, info1 = self._get_reset_data_generator()
+                except RecursionError as e:
+                    print(f"RecursionError occurred: {e}")
+                    continue
+
+                self._save_obs_pairs(obs0, obs1, info0['state_dict'], info1['state_dict'], control_attr_save_path, i)
+                print("info1",info0["state_dict"])
+                print("info2",info1['state_dict'])
+                print(control_attr, control_attr_sample)
+                i+=1
+                
 
     # triplet (o,o',o'',a',a'')
     def sample_obs_triplets(self, num_triplets):
         pass
+
+    def _set_data_generator_reset_type(self, reset_type):
+        assert reset_type in ["custom", "random", "default"]
+        self.data_generator.reset_type = reset_type
+
+    def _get_reset_data_generator(self):
+        return self.data_generator.reset()
+
+    def _set_data_generator_control_attr(self, control_attr, control_attr_sample):
+        self.data_generator.controlled_factors = {control_attr: control_attr_sample}
+
+    def _get_step_data_generator(self, action):
+        return self.data_generator.step(action)
+    
+    def _get_data_generator_random_action(self):
+        return self.data_generator.action_space.sample()
+
+    def _get_data_generator_state_attr(self):
+        return self.data_generator.state_attributes
+
+    def _gen_rand_control_attr(self, control_attr):
+        gym_space_params = self.data_generator.gym_space_params
+        attribute_types = self.data_generator.state_attribute_types[control_attr]
+
+        sample_val = []
+        for attr_type in attribute_types:
+            min_val, max_val, dtype = gym_space_params[attr_type]
+            if attr_type == "coordinate_width" or attr_type == "coordinate_height":
+                min_val = min_val + 1
+                max_val = max_val - 1
+            random_val = np.random.randint(min_val, max_val)
+            sample_val.append(dtype(random_val))
+
+        if len(sample_val)==1:
+            return sample_val[0]
+        else:
+            return np.array(sample_val)
     
     def _save_episode_obs(self, episode_obs, save_path):
         observation_type = self.data_generator.observation_type
@@ -139,6 +202,31 @@ class GenerateDataset:
         action_array = np.array(episode_reward)
         np.save(reward_path, action_array) 
 
+    def _save_obs_pairs(self, obs0, obs1, state_dict0, state_dict1, save_path, idx):
+        observation_type = self.data_generator.observation_type
+        if observation_type == 'image':
+            image_path = os.path.join(save_path, f"obs-image-{idx}-0.png")
+            img = Image.fromarray(obs0)
+            img.save(image_path)
+            image_path = os.path.join(save_path, f"obs-image-{idx}-1.png")
+            img = Image.fromarray(obs1)
+            img.save(image_path)
+        elif observation_type == 'expert':
+            expert_path = os.path.join(save_path, f"obs-expert-{idx}-0.npy")
+            expert_array = np.array(obs0)
+            np.save(expert_path, expert_array)     
+            expert_path = os.path.join(save_path, f"obs-expert-{idx}-1.npy")
+            expert_array = np.array(obs1)
+            np.save(expert_path, expert_array)  
+        elif observation_type == 'factored':
+            raise NotImplementedError('ERROR: to be implemented after factored representation encoder')
+        else:
+            raise Exception('ERROR: observation type {} undefined'.format(observation_type))
+        state_dict_array = np.array(state_dict0)
+        np.save(os.path.join(save_path,f"state_dict-{idx}-0.npy"), state_dict_array)  
+        state_dict_array = np.array(state_dict1)
+        np.save(os.path.join(save_path,f"state_dict-{idx}-1.npy"), state_dict_array)  
+
 
 if __name__ == '__main__':
     from data.data_generator import DataGenerator
@@ -147,5 +235,5 @@ if __name__ == '__main__':
     mdg = GenerateDataset(data_generator, dataset_root_path='./temp_samples', episode_max_length=10)
 
     #mdg.sample_episodes(num_episodes=5)
-    mdg.sample_obs_pairs(num_pairs=5)
+    mdg.sample_obs_pairs(num_pairs_per_control_attr=5)
     #mdg.sample_obs_triplets(num_triplets=5)

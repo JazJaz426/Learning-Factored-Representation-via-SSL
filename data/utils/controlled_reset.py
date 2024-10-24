@@ -12,13 +12,11 @@ class CustomEnvReset:
     def __init__(self, env_name):
 
         custom_reset = {'DoorKey': self._custom_reset_doorkey, 'LavaCrossing': self._custom_reset_lavacrossing, 'FourRooms': self._custom_reset_fourrooms}
-        
         for k in custom_reset.keys():
             if k in env_name:
                 self.factored_reset = custom_reset[k]
 
     def _custom_reset_doorkey(self, env, width, height, controlled_factors):
-        
         #change the random seed locally 
         curr_rng = env.unwrapped.np_random
         local_rng = np.random.default_rng(int(100*random.random()))
@@ -34,11 +32,11 @@ class CustomEnvReset:
         env.unwrapped.grid.wall_rect(0, 0, width, height)
 
         # factor 1: control goal position 
-        goal_pos = (controlled_factors['goal_pos'][0], controlled_factors['goal_pos'][1]) if 'goal_pos' in controlled_factors else (env.unwrapped._rand_int(1, width - 1), env.unwrapped._rand_int(1, height - 1))
-        if goal_pos not in used_locations:
-            env.unwrapped.put_obj(Goal(), goal_pos[0], goal_pos[1])
-            used_locations.add(goal_pos)
-
+        goal_pos = (controlled_factors['goal_pos'][0], controlled_factors['goal_pos'][1]) if 'goal_pos' in controlled_factors else None
+        while goal_pos is None or ('door_pos' in controlled_factors and goal_pos[0]==controlled_factors['door_pos'][0]):
+            goal_pos = (env.unwrapped._rand_int(1, width - 1), env.unwrapped._rand_int(1, height - 1))
+        env.unwrapped.put_obj(Goal(), goal_pos[0], goal_pos[1])
+        used_locations.add(goal_pos)
         
         # factor 2: control door position
         if 'door_pos' in controlled_factors:
@@ -46,7 +44,7 @@ class CustomEnvReset:
             doorIdx = controlled_factors['door_pos'][1]
         else:
             splitIdx = None; doorIdx = None
-            while (splitIdx, doorIdx) in used_locations or (splitIdx is None or doorIdx is None):
+            while (splitIdx, doorIdx) in used_locations or (splitIdx is None or doorIdx is None) or (goal_pos[0]==splitIdx):
                 splitIdx = env.unwrapped._rand_int(2, width - 2)
                 doorIdx = env.unwrapped._rand_int(1, height - 2)
         
@@ -57,6 +55,7 @@ class CustomEnvReset:
         door_open = controlled_factors['door_open'] if 'door_open' in controlled_factors else False
         env.unwrapped.put_obj(Door("yellow", is_locked=door_locked, is_open=door_open), splitIdx, doorIdx)
         used_locations.add((splitIdx, doorIdx))
+
 
         # factor 5: control key position 
         # factor 6: control holding key
@@ -70,7 +69,7 @@ class CustomEnvReset:
                 key_top = (0,0)
                 key_size = (splitIdx, height)
 
-            env.unwrapped.place_obj(obj=Key("yellow"), top= key_top, size= key_size)
+            env.unwrapped.place_obj(obj=Key("yellow"), top= key_top, size= key_size,max_tries=10)
         else:
             #need to set the agent property as holding key
             env.unwrapped.carrying = Key("yellow")
@@ -78,7 +77,7 @@ class CustomEnvReset:
         # factor 7: control agent position
         agent_top = tuple(controlled_factors['agent_pos']) if 'agent_pos' in controlled_factors else (0,0)
         agent_size = (1,1) if 'agent_pos' in controlled_factors else (splitIdx, height)
-        env.unwrapped.place_agent(top=agent_top, size=agent_size)
+        env.unwrapped.place_agent(top=agent_top, size=agent_size, max_tries=10)
         
         #factor 8: control agent direction 
         if 'agent_dir' in controlled_factors:
@@ -89,7 +88,6 @@ class CustomEnvReset:
         env.unwrapped.mission = "use the key to open the door and then get to the goal"
         #reset the original rng after resetting env
         env.unwrapped.np_random = curr_rng
-
         return env
 
 
@@ -162,7 +160,7 @@ class CustomEnvReset:
             env.unwrapped.put_obj(goal, *tuple(controlled_factors['goal_pos']))
             goal.init_pos, goal.cur_pos = tuple(controlled_factors['goal_pos']), tuple(controlled_factors['goal_pos'])
         else:
-            env.unwrapped.place_obj(Goal())
+            env.unwrapped.place_obj(Goal(),max_tries=10)
         
         env.unwrapped.mission = "reach the goal"
 

@@ -77,6 +77,7 @@ class DataGenerator(gym.Env):
         # Configs from the yaml file
         self.observation_type = configs['observation_space']
         self.state_attributes = configs['state_attributes']
+        self.state_attribute_types = configs['state_attribute_types']
         self.reset_type = configs['reset_type']
 
         # Create the environment
@@ -94,7 +95,7 @@ class DataGenerator(gym.Env):
 
         #Store the controlled factors array
         self.controlled_factors = configs['controlled_factors']
-
+        
         #storing the custom reset function if needed
         self.custom_resetter = CustomEnvReset(configs['environment_name'])
 
@@ -106,9 +107,14 @@ class DataGenerator(gym.Env):
 
         #creating the observation space and actions space
         self.action_space = self.env.action_space
+
+        self.gym_space_params = {'boolean': (0, 1, int), 
+                                'coordinate_width': (0, self.env.grid.width, int), 
+                                'coordinate_height': (0, self.env.grid.height, int), 
+                                'agent_dir': (0, 3, int)
+                                }
         
         self.observation_space = self._create_observation_space(configs['state_attribute_types'])
-
 
         #creating other gym environment attributes
         self.spec = self.env.spec
@@ -124,9 +130,7 @@ class DataGenerator(gym.Env):
             return gym.spaces.Box(low=0, high=255, shape=frame.shape, dtype=np.uint8)
 
         elif self.observation_type == 'expert':
-            
-            gym_space_params = {'boolean': (0, 1, int), 'coordinate_width': (0, self.env.grid.width, int), 'coordinate_height': (0, self.env.grid.height, int), 'agent_dir': (0, 3, int)}
-
+    
             relevant_state_variables = list(self._construct_state().keys())
 
             min_values = np.array([]); max_values = np.array([])
@@ -136,7 +140,7 @@ class DataGenerator(gym.Env):
 
                 for t in types:
                     
-                    space_param = gym_space_params[t]
+                    space_param = self.gym_space_params[t]
 
                     min_values = np.append(min_values, space_param[0])
                     max_values = np.append(max_values, space_param[1])
@@ -219,6 +223,9 @@ class DataGenerator(gym.Env):
         #add the visual observation before augmentation for debugging
         info['original_obs'] = frame
 
+        img = Image.fromarray(frame)
+        img.save("frame.jpeg")
+
         #apply image transformations if needed
         frame = self.data_augmentor.apply_transformation(frame)
 
@@ -249,7 +256,6 @@ class DataGenerator(gym.Env):
 
         #extract the types of all tiles in the grid: useful for goal, key and door position
         types = np.array([x.type if x is not None else None for x in self.env.unwrapped.grid.grid])
-
         for attr in self.state_attributes:
 
             if hasattr(self.env.unwrapped, attr):
