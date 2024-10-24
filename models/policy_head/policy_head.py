@@ -206,7 +206,7 @@ class PolicyHead:
                     env=self.train_env,
                     seed=model_num,
                     **ppo_params,
-                    tensorboard_log=f"./{self.algorithm}_{self.data_config['environment_name']}_tensorboard/{self.data_config['observation_space']}/seed_{model_num}/"
+                    tensorboard_log=f"./logs/{self.algorithm}_{self.data_config['environment_name']}_tensorboard/{self.data_config['observation_space']}/seed_{model_num}/"
                 )
             elif self.algorithm == "DQN":
                 dqn_params = {k: v for k, v in self.model_config['dqn'].items() if v is not None}
@@ -215,7 +215,7 @@ class PolicyHead:
                     env=self.train_env,
                     seed=model_num,
                     **dqn_params,
-                    tensorboard_log=f"./{self.algorithm}_{self.data_config['environment_name']}_tensorboard/{self.data_config['observation_space']}/seed_{model_num}/"
+                    tensorboard_log=f"./logs/{self.algorithm}_{self.data_config['environment_name']}_tensorboard/{self.data_config['observation_space']}/seed_{model_num}/"
                 )
             elif self.algorithm == "A2C":
                 a2c_params = {k: v for k, v in self.model_config['a2c'].items() if v is not None}
@@ -224,7 +224,7 @@ class PolicyHead:
                     env=self.train_env,
                     seed=model_num,
                     **a2c_params,
-                    tensorboard_log=f"./{self.algorithm}_{self.data_config['environment_name']}_tensorboard/{self.data_config['observation_space']}/seed_{model_num}/"
+                    tensorboard_log=f"./logs/{self.algorithm}_{self.data_config['environment_name']}_tensorboard/{self.data_config['observation_space']}/seed_{model_num}/"
                 )
             else:
                 raise ValueError(f"Unsupported RL algorithm: {self.algorithm}")
@@ -240,12 +240,12 @@ class PolicyHead:
         iteration = 0
         for seed in self.models.keys():
 
-            if os.path.exists(f"./{self.algorithm}_{self.data_config['environment_name']}_weights/{self.data_config['observation_space']}/seed_{seed}") and len(os.listdir(f"./{self.algorithm}_{self.data_config['environment_name']}_weights/{self.data_config['observation_space']}/seed_{seed}")) > 0:
-                latest_weight = list(sorted(os.listdir(f"./{self.algorithm}_{self.data_config['environment_name']}_weights/{self.data_config['observation_space']}/seed_{seed}")))
+            if os.path.exists(f"./logs/{self.algorithm}_{self.data_config['environment_name']}_weights/{self.data_config['observation_space']}/seed_{seed}") and len(os.listdir(f"./logs/{self.algorithm}_{self.data_config['environment_name']}_weights/{self.data_config['observation_space']}/seed_{seed}")) > 0:
+                latest_weight = list(sorted(os.listdir(f"./logs/{self.algorithm}_{self.data_config['environment_name']}_weights/{self.data_config['observation_space']}/seed_{seed}")))
                 
                 latest_weight = max(latest_weight, key=lambda f: int(re.search(r'\d+', f.split('step_')[1]).group()))
 
-                final_path = os.path.join(f"./{self.algorithm}_{self.data_config['environment_name']}_weights/{self.data_config['observation_space']}/seed_{seed}", latest_weight.split('.')[0])
+                final_path = os.path.join(f"./logs/{self.algorithm}_{self.data_config['environment_name']}_weights/{self.data_config['observation_space']}/seed_{seed}", latest_weight.split('.')[0])
 
                 self.models[seed].load(path = final_path, env = self.train_env)
 
@@ -254,19 +254,17 @@ class PolicyHead:
             for seed, model in self.models.items():
 
                 #NOTE: potentially uncomment if needed
-                # new_logger = configure(f"./{self.algorithm}_tensorboard/model_{seed}", ["stdout", "tensorboard"])
-                # model.set_logger(new_logger)
 
-                reward_callback = RewardValueCallback(env = self.train_env, save_freq = self.model_config['reward_log_freq'], log_dir=f"./{self.algorithm}_{self.data_config['environment_name']}_tensorboard/{self.data_config['observation_space']}/seed_{seed}/", train=True)
-                eval_reward_callback = RewardValueCallback(env = self.eval_env, save_freq = self.model_config['reward_log_freq'], log_dir=f"./{self.algorithm}_{self.data_config['environment_name']}_tensorboard/{self.data_config['observation_space']}/seed_{seed}/", train=False)
-                gif_callback = GifLoggingCallback(env = self.train_env, save_freq = self.model_config['gif_log_freq'], log_dir = f"./{self.algorithm}_{self.data_config['environment_name']}_policyviz/{self.data_config['observation_space']}/seed_{seed}/", name_prefix = 'policy_gif')
-                checkpoint_callback = CheckpointCallback(save_freq=self.model_config['save_weight_freq'], save_path=f"./{self.algorithm}_{self.data_config['environment_name']}_weights/{self.data_config['observation_space']}/seed_{seed}/", name_prefix=f'{self.algorithm}_seed{seed}_step', save_replay_buffer=True)
+                reward_callback = RewardValueCallback(env = self.train_env, save_freq = self.model_config['reward_log_freq'], log_dir=f"./logs/{self.algorithm}_{self.data_config['environment_name']}_tensorboard/{self.data_config['observation_space']}/seed_{seed}/", train=True)
+                eval_reward_callback = RewardValueCallback(env = self.eval_env, save_freq = self.model_config['reward_log_freq'], log_dir=f"./logs/{self.algorithm}_{self.data_config['environment_name']}_tensorboard/{self.data_config['observation_space']}/seed_{seed}/", train=False)
+                gif_callback = GifLoggingCallback(env = self.train_env, save_freq = self.model_config['gif_log_freq'], log_dir = f"./logs/{self.algorithm}_{self.data_config['environment_name']}_policyviz/{self.data_config['observation_space']}/seed_{seed}/", name_prefix = 'policy_gif')
+                checkpoint_callback = CheckpointCallback(save_freq=self.model_config['save_weight_freq'], save_path=f"./logs/{self.algorithm}_{self.data_config['environment_name']}_weights/{self.data_config['observation_space']}/seed_{seed}/", name_prefix=f'{self.algorithm}_seed{seed}_step', save_replay_buffer=True)
 
                 # Create the callback list
                 callback = CallbackList([reward_callback, eval_reward_callback, gif_callback, checkpoint_callback])
 
                 model.learn(total_timesteps=train_interval, tb_log_name=f'{self.algorithm}_{seed}', progress_bar = True, reset_num_timesteps=False, callback = callback)
-                # model.save(path=f"./{self.algorithm}_weights/seed_{seed}/{self.algortihm}_seed{seed}_step{self.model.num_timesteps}")
+                # model.save(path=f"./logs/{self.algorithm}_weights/seed_{seed}/{self.algortihm}_seed{seed}_step{self.model.num_timesteps}")
 
             iteration += 1
 
@@ -312,11 +310,9 @@ def train_and_evaluate_policy_old(self, total_timestamps):
         for seed, model in self.models.items():
 
             #NOTE: potentially uncomment if needed
-            # new_logger = configure(f"./{self.algorithm}_tensorboard/model_{seed}", ["stdout", "tensorboard"])
-            # model.set_logger(new_logger)
 
-            reward_callback = RewardValueCallback(env = self.train_env, save_freq = self.model_config['reward_log_freq'], log_dir=f"./{self.algorithm}_tensorboard/{self.data_config['observation_space']}/seed_{seed}/")
-            gif_callback = GifLoggingCallback(env = self.train_env, save_freq = self.model_config['gif_log_freq'], log_dir = f"./{self.algorithm}_policyviz/{self.data_config['observation_space']}/seed_{seed}/", name_prefix = 'policy_gif')
+            reward_callback = RewardValueCallback(env = self.train_env, save_freq = self.model_config['reward_log_freq'], log_dir=f"./logs/{self.algorithm}_tensorboard/{self.data_config['observation_space']}/seed_{seed}/")
+            gif_callback = GifLoggingCallback(env = self.train_env, save_freq = self.model_config['gif_log_freq'], log_dir = f"./logs/{self.algorithm}_policyviz/{self.data_config['observation_space']}/seed_{seed}/", name_prefix = 'policy_gif')
             # model.learn(total_timesteps=train_interval, callback=callback)
             # Create the callback list
             callback = CallbackList([reward_callback, gif_callback])
