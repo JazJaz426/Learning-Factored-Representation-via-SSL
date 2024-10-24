@@ -223,9 +223,6 @@ class DataGenerator(gym.Env):
         #add the visual observation before augmentation for debugging
         info['original_obs'] = frame
 
-        img = Image.fromarray(frame)
-        img.save("frame.jpeg")
-
         #apply image transformations if needed
         frame = self.data_augmentor.apply_transformation(frame)
 
@@ -268,7 +265,6 @@ class DataGenerator(gym.Env):
                 state[attr] = self.env.unwrapped.grid.grid[np.where(types=='key')[0][0]].cur_pos
             elif ('door' in types) and (attr == 'door_pos'):
                 state[attr] = self.env.unwrapped.grid.grid[np.where(types=='door')[0][0]].cur_pos
-            
 
             #other attributes like opening, holding, locked etc...
             elif ('key' in types) and (attr == 'holding_key'):

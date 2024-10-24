@@ -51,8 +51,15 @@ class CustomEnvReset:
         # factor 3: control door locked / unlocked
         # factor 4: control door open/closed
         env.unwrapped.grid.vert_wall(splitIdx, 0)
-        door_locked = controlled_factors['door_locked'] if 'door_locked' in controlled_factors else True
-        door_open = controlled_factors['door_open'] if 'door_open' in controlled_factors else False
+        door_locked = controlled_factors['door_locked'] if 'door_locked' in controlled_factors else np.random.randint(0, 2)
+        if 'door_open' in controlled_factors:
+            door_open = controlled_factors['door_open']
+            if door_open:
+                door_locked = False
+        elif door_locked:
+            door_open = False
+        else:
+            door_open = np.random.randint(0, 2)
         env.unwrapped.put_obj(Door("yellow", is_locked=door_locked, is_open=door_open), splitIdx, doorIdx)
         used_locations.add((splitIdx, doorIdx))
 
@@ -60,19 +67,24 @@ class CustomEnvReset:
         # factor 5: control key position 
         # factor 6: control holding key
         # pdb.set_trace()
-        if not (('door_locked' in controlled_factors and controlled_factors['door_locked'] is False) or  ('holding_key' in controlled_factors and controlled_factors['holding_key'] is True)):
-            
+        #if not (('door_locked' in controlled_factors and controlled_factors['door_locked'] is False) or  ('holding_key' in controlled_factors and controlled_factors['holding_key'] is True)):
+        if 'holding_key' in controlled_factors and controlled_factors['holding_key'] == 1:
+            #need to set the agent property as holding key
+            env.unwrapped.carrying = Key("yellow")
+        else:
             if 'key_pos' in controlled_factors:
                 key_top = controlled_factors['key_pos'] 
                 key_size = (1,1) 
+                env.unwrapped.place_obj(obj=Key("yellow"), top= key_top, size= key_size,max_tries=10)
             else:
-                key_top = (0,0)
-                key_size = (splitIdx, height)
-
-            env.unwrapped.place_obj(obj=Key("yellow"), top= key_top, size= key_size,max_tries=10)
-        else:
-            #need to set the agent property as holding key
-            env.unwrapped.carrying = Key("yellow")
+                holding_key = np.random.randint(0,2)
+                if holding_key:
+                    env.unwrapped.carrying = Key("yellow")
+                else:
+                    key_top = (0,0)
+                    key_size = (splitIdx, height)
+                    env.unwrapped.place_obj(obj=Key("yellow"), top= key_top, size= key_size,max_tries=10)
+        
 
         # factor 7: control agent position
         agent_top = tuple(controlled_factors['agent_pos']) if 'agent_pos' in controlled_factors else (0,0)
