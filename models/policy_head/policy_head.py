@@ -193,7 +193,7 @@ class PolicyHead:
         models = {}
         for model_num in range(num_models):
             if self.algorithm == "PPO":
-                ppo_params = {k: v for k, v in self.model_config['ppo'].items() if (v is not None and v is True)}
+                ppo_params = {k: v for k, v in self.model_config['ppo'].items() if v is not None}
 
                 #NOTE: include lr schedule if needed
                 #lr_schedule = self.linear_schedule(self.model_config['learning_rate'])                
@@ -205,7 +205,7 @@ class PolicyHead:
                     tensorboard_log=f"./{self.algorithm}_{self.data_config['environment_name']}_tensorboard/{self.data_config['observation_space']}/seed_{model_num}/"
                 )
             elif self.algorithm == "DQN":
-                dqn_params = {k: v for k, v in self.model_config['dqn'].items() if (v is not None and v is True)}
+                dqn_params = {k: v for k, v in self.model_config['dqn'].items() if v is not None}
                 models[model_num] = DQN(
                     policy=self.policy_name,
                     env=self.train_env,
@@ -214,7 +214,7 @@ class PolicyHead:
                     tensorboard_log=f"./{self.algorithm}_{self.data_config['environment_name']}_tensorboard/{self.data_config['observation_space']}/seed_{model_num}/"
                 )
             elif self.algorithm == "A2C":
-                a2c_params = {k: v for k, v in self.model_config['a2c'].items() if (v is not None and v is True)}
+                a2c_params = {k: v for k, v in self.model_config['a2c'].items() if v is not None}
                 models[model_num] = A2C(
                     policy=self.policy_name,
                     env=self.train_env,
@@ -231,9 +231,6 @@ class PolicyHead:
         train_interval = self.model_config['train_interval']
         # eval_interval = self.model_config['eval_interval']
         iteration = 0
-
-        pdb.set_trace()
-
         for seed in self.models.keys():
             if os.path.exists(f"./{self.algorithm}_weights/seed_{seed}") and len(os.listdir(f"./{self.algorithm}_weights/seed_{seed}")) > 0:
                 latest_weight = list(sorted(os.listdir(f"./{self.algorithm}_weights/seed_{seed}")))
