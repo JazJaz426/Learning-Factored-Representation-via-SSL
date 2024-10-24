@@ -20,7 +20,7 @@ policy_head:
     gae_lambda: null
     seed: null
 
- dqn:
+  dqn:
     buffer_size: 100
     learning_starts: 1000
     batch_size: 32
@@ -29,7 +29,6 @@ policy_head:
     train_freq: 100
     exploration_fraction: 0.05
     max_grad_norm: 10
-    optimize_memory_usage: True
     seed: null
     verbose: null
 
