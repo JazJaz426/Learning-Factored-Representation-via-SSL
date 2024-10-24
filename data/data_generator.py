@@ -112,7 +112,7 @@ class DataGenerator(gym.Env):
         #return the desired gym Spaces based on the observation space
 
         if self.observation_type == 'image':
-            frame = self.env.render()
+            frame = self.env.get_frame(tile_size=8)
             return gym.spaces.Box(low=0, high=255, shape=frame.shape, dtype=np.uint8)
 
         elif self.observation_type == 'expert':
@@ -144,7 +144,7 @@ class DataGenerator(gym.Env):
 
     def render(self):
         '''Implementing render() according to ABC of gymnasium env'''
-        frame = self.env.render()
+        frame = self.env.get_frame(tile_size=8)
         frame = self.data_augmentor.apply_transformation(frame)
         return frame
 
@@ -163,7 +163,7 @@ class DataGenerator(gym.Env):
         (_, reward, terminated, truncated, info) = self.env.step(action)
         
 
-        frame = self.env.render()
+        frame = self.env.get_frame(tile_size=8)
 
         #add the visual observation before augmentation for debugging
         info['original_obs'] = frame
@@ -212,7 +212,7 @@ class DataGenerator(gym.Env):
             self._randomize_reset()
         
 
-        frame = self.env.render()
+        frame = self.env.get_frame(tile_size=8)
         #add the visual observation before augmentation for debugging
         info['original_obs'] = frame
 
