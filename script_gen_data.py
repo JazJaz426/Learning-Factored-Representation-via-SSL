@@ -304,8 +304,8 @@ if __name__ == '__main__':
     from data.data_generator import DataGenerator
 
     data_generator = DataGenerator(config_path='./configs/data_generator/config.yaml')
-    mdg = GenerateDataset(data_generator, dataset_root_path='./temp_samples', episode_max_length=10)
+    mdg = GenerateDataset(data_generator, dataset_root_path='./temp_samples_3', episode_max_length=10)
 
-    mdg.sample_episodes(num_episodes=10)
-    mdg.sample_obs_pairs(num_pairs_per_control_attr=10)
-    mdg.sample_obs_triplets(num_triplets=10)
+    mdg.sample_episodes(num_episodes=30)
+    mdg.sample_obs_pairs(num_pairs_per_control_attr=30)
+    mdg.sample_obs_triplets(num_triplets=30)
