@@ -201,7 +201,6 @@ class PolicyHead:
                     policy=self.policy_name,
                     env=self.train_env,
                     seed=model_num,
-                    verbose = self.model_config['verbose'],
                     **ppo_params,
                     tensorboard_log=f"./{self.algorithm}_{self.data_config['environment_name']}_tensorboard/{self.data_config['observation_space']}/seed_{model_num}/"
                 )
@@ -211,7 +210,6 @@ class PolicyHead:
                     policy=self.policy_name,
                     env=self.train_env,
                     seed=model_num,
-                    verbose = self.model_config['verbose'],
                     **dqn_params,
                     tensorboard_log=f"./{self.algorithm}_{self.data_config['environment_name']}_tensorboard/{self.data_config['observation_space']}/seed_{model_num}/"
                 )
@@ -221,7 +219,6 @@ class PolicyHead:
                     policy=self.policy_name,
                     env=self.train_env,
                     seed=model_num,
-                    verbose= self.model_config['verbose'],
                     **a2c_params,
                     tensorboard_log=f"./{self.algorithm}_{self.data_config['environment_name']}_tensorboard/{self.data_config['observation_space']}/seed_{model_num}/"
                 )
