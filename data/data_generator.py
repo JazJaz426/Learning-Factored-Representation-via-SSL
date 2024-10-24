@@ -31,6 +31,14 @@ TODO: implement video recording stored in the src folder (only during testing)
 [DONE] TODO: implement (multiple) controlled environment factors at once 
     - Random bug sometimes does not allow for factored expert state to be retrieved 
 '''
+
+
+'''
+[CH 10/23] Add global action dict
+'''
+action_list = ["left","right","forward","pickup","drop","activate","done"]
+
+
 class StochasticActionWrapper(gym.ActionWrapper):
     """
     Add stochasticity to the actions
@@ -59,12 +67,12 @@ class DataGenerator(gym.Env):
             config = yaml.safe_load(file)
         return config
 
-    def __init__(self):
+    def __init__(self, config_path):
 
         super(DataGenerator, self).__init__()
 
         # Parse yaml file parameters for data generator
-        configs = self.load_config(os.path.join(os.path.dirname(__file__), '../configs/data_generator/config.yaml'))
+        configs = self.load_config(os.path.join(config_path))
         
         # Configs from the yaml file
         self.observation_type = configs['observation_space']
@@ -137,8 +145,6 @@ class DataGenerator(gym.Env):
             return gym.spaces.Box(low=min_values, high=max_values, dtype=int)
 
 
-
-
         elif self.observation_type == 'factored':
             raise NotImplementedError('ERROR: to be implemented after factored representation encoder')
 
@@ -209,7 +215,6 @@ class DataGenerator(gym.Env):
         elif self.reset_type == 'random':
             self._randomize_reset()
         
-
         frame = self.env.render()
         #add the visual observation before augmentation for debugging
         info['original_obs'] = frame
@@ -229,21 +234,11 @@ class DataGenerator(gym.Env):
         info['state_dict'] = state
 
         state = [item for sublist in state.values() for item in (sublist if isinstance(sublist, tuple) else [sublist])] 
-
-        
         observation = self._get_obs(image = frame, state = state, factored = factored)
-
-        
         
         return observation, info
     
-
-
-
         
-            
-        
-
     def _factorize_obs(self, observation):
         #TODO: implement inference time call to factored representation model
         return None
@@ -298,10 +293,8 @@ class DataGenerator(gym.Env):
 
 if __name__ == '__main__':
 
-    pdb.set_trace()
-
-    data_generator = DataGenerator()
-
+    # pdb.set_trace()
+    data_generator = DataGenerator(config_path='../configs/data_generator/config.yaml')
     MAX_STEPS = 5
 
     temp_dir = os.path.relpath('./temp_obs')
@@ -311,29 +304,19 @@ if __name__ == '__main__':
         # pdb.set_trace()
         obs, info = data_generator.reset(seed=j)
         img = Image.fromarray(info['obs'])
-        img.save(os.path.join(temp_dir, 'reset_test.jpeg'))
+        img.save(os.path.join(temp_dir, f'run_{j}_reset.jpeg'))
 
         for i in range(MAX_STEPS):
-
             rand_action = 6
-
             while (rand_action == 6):
-            
                 rand_action = data_generator.env.action_space.sample()
+            observation, reward, terminated, truncated, info = data_generator.step(rand_action)            
 
-            observation, reward, terminated, truncated, info = data_generator.step(rand_action)
-
-            print('Current State :', observation)
+            # print('Current State :', observation)
+            print('Action: ', action_list[rand_action])
             print('Info: ', info['state_dict'])
             print('Reward: ', reward)
 
             img = Image.fromarray(info['obs'])
-
-            img.save(os.path.join(temp_dir, '{}_modified.jpeg'.format(i)))
-
-            # img = Image.fromarray(info['original_obs'])
-
-            # img.save(os.path.join(temp_dir, '{}_original.jpeg'.format(i)))
-        
-        
+            img.save(os.path.join(temp_dir, f'run_{j}_step_{i}_action_{rand_action}.jpeg'))
 

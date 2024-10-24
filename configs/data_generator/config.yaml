@@ -25,7 +25,6 @@ state_attribute_types: {'agent_pos': ['coordinate_width', 'coordinate_height'], 
 #options: [default, random, custom]
 reset_type: default
 
-
 #options: [agent_pos: [x,y], agent_dir: [int], goal_pos: [x,y], key_pos: [x,y], door_pos: [x,y], holding_key: true/false, door_locked: true/false, door_open: true/false]
 #agent_dir: 0 - right, 1 - down, 2 - left, 3 - up
 controlled_factors: {
