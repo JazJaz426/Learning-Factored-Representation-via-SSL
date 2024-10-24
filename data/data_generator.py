@@ -303,6 +303,11 @@ if __name__ == '__main__':
     pdb.set_trace()
 
     data_generator = DataGenerator()
+    data_gen_test = DataGenerator(config_filename='config_test.yaml')
+    
+    obs, info = data_generator.reset()
+    obs_t, info_t = data_gen_test.reset()
+    
 
     MAX_STEPS = 5
 
