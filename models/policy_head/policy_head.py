@@ -235,7 +235,6 @@ class PolicyHead:
         pdb.set_trace()
 
         for seed in self.models.keys():
-
             if os.path.exists(f"./{self.algorithm}_weights/seed_{seed}") and len(os.listdir(f"./{self.algorithm}_weights/seed_{seed}")) > 0:
                 latest_weight = list(sorted(os.listdir(f"./{self.algorithm}_weights/seed_{seed}")))
                 self.models[seed].load(path = latest_weight, env = self.train_env)
