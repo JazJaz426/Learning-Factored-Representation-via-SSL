@@ -156,8 +156,11 @@ class PolicyHead:
         print('POLICY NAME: ', self.policy_name)
         self.train_env = train_env
         self.eval_env = eval_env
-        # pdb.set_trace()
         self.models = self.create_models(num_models=self.model_config['num_models'])
+
+        #check that critical configs for test and train are equal 
+        if not ( (self.train_env.observation_type == self.eval_env.observation_type) and isinstance(self.eval_env.env.unwrapped, type(self.train_env.env.unwrapped)) ):
+            raise Exception("ERROR: observaiton type and environment name need to be same for train and eval configs")
 
     def linear_schedule(self, initial_value: float):
         """
@@ -289,6 +292,7 @@ class PolicyHead:
         pass
 
 if __name__ == '__main__':
+    
     policy_head = PolicyHead(DataGenerator('config.yaml'), DataGenerator('config_test.yaml'), 'configs/models/config.yaml', 'configs/data_generator/config.yaml')
     policy_head.train_and_evaluate_policy(total_timestamps=1000000)
 
