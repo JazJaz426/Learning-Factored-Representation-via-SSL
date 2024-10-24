@@ -33,6 +33,8 @@ class CustomEnvReset:
         # Generate the surrounding walls
         env.unwrapped.grid.wall_rect(0, 0, width, height)
 
+        
+
         # factor 1: control goal position 
         goal_pos = (controlled_factors['goal_pos'][0], controlled_factors['goal_pos'][1]) if 'goal_pos' in controlled_factors else (env.unwrapped._rand_int(1, width - 1), env.unwrapped._rand_int(1, height - 1))
         if goal_pos not in used_locations:

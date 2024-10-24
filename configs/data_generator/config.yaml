@@ -29,8 +29,13 @@ reset_type: default
 #options: [agent_pos: [x,y], agent_dir: [int], goal_pos: [x,y], key_pos: [x,y], door_pos: [x,y], holding_key: true/false, door_locked: true/false, door_open: true/false]
 #agent_dir: 0 - right, 1 - down, 2 - left, 3 - up
 controlled_factors: {
-  agent_pos: [1,1],
-  goal_pos: [2,2]
+  agent_pos: [7,1],
+  agent_dir: 1,
+  key_pos: [8,3],
+  goal_pos: [10,10],
+  holding_key: true,
+  door_locked: false,
+  door_open: true
 }
 
 #options: true/false

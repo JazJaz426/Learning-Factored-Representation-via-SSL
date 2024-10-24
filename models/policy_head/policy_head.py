@@ -13,6 +13,7 @@ from torch.utils.tensorboard import SummaryWriter
 import gymnasium as gym
 import torch
 from matplotlib import pyplot as plt
+import re
 
 class RewardValueCallback(BaseCallback):
     def __init__(self, env: gym.Env, save_freq: int, log_dir: str, verbose=0, max_steps: int = 200, train=True):
@@ -228,13 +229,22 @@ class PolicyHead:
     
 
     def train_and_evaluate_policy(self, total_timestamps):
+
+        
+        
         train_interval = self.model_config['train_interval']
         # eval_interval = self.model_config['eval_interval']
         iteration = 0
         for seed in self.models.keys():
-            if os.path.exists(f"./{self.algorithm}_weights/seed_{seed}") and len(os.listdir(f"./{self.algorithm}_weights/seed_{seed}")) > 0:
-                latest_weight = list(sorted(os.listdir(f"./{self.algorithm}_weights/seed_{seed}")))
-                self.models[seed].load(path = latest_weight, env = self.train_env)
+
+            if os.path.exists(f"./{self.algorithm}_{self.data_config['environment_name']}_weights/{self.data_config['observation_space']}/seed_{seed}") and len(os.listdir(f"./{self.algorithm}_{self.data_config['environment_name']}_weights/{self.data_config['observation_space']}/seed_{seed}")) > 0:
+                latest_weight = list(sorted(os.listdir(f"./{self.algorithm}_{self.data_config['environment_name']}_weights/{self.data_config['observation_space']}/seed_{seed}")))
+                
+                latest_weight = max(latest_weight, key=lambda f: int(re.search(r'\d+', f.split('step_')[1]).group()))
+
+                final_path = os.path.join(f"./{self.algorithm}_{self.data_config['environment_name']}_weights/{self.data_config['observation_space']}/seed_{seed}", latest_weight.split('.')[0])
+
+                self.models[seed].load(path = final_path, env = self.train_env)
 
         while iteration * (train_interval) < total_timestamps:
             
