@@ -14,9 +14,10 @@ import gymnasium as gym
 import torch
 from matplotlib import pyplot as plt
 import re
+import pandas as pd
 
 class RewardValueCallback(BaseCallback):
-    def __init__(self, env: gym.Env, save_freq: int, log_dir: str, verbose=0, max_steps: int = 200, train=True):
+    def __init__(self, env: gym.Env, save_freq: int, log_dir: str, csv_log_dir: str, verbose=0, max_steps: int = 200, train=True):
         super(RewardValueCallback, self).__init__(verbose)
         self.log_dir = log_dir
         self.writer = SummaryWriter(log_dir)
@@ -24,6 +25,9 @@ class RewardValueCallback(BaseCallback):
         self.env = env
         self.save_freq = save_freq
         self.train = train
+
+        self.csv_log_dir = os.path.join(logdir, 'episodic_reward_logs.csv')
+        self.csv_logger = pd.DataFrame(columns=['train/test', 'step', 'seed', 'cumul_reward'])
 
         os.makedirs(self.log_dir, exist_ok=True)
 
@@ -33,6 +37,9 @@ class RewardValueCallback(BaseCallback):
         if self.n_calls % self.save_freq == 0:
             # pdb.set_trace()
             self._log_rewards_and_value()
+            self.csv_logger.to_csv(self.csv_log_dir, index=False)
+            
+
         return True
 
     
@@ -65,6 +72,9 @@ class RewardValueCallback(BaseCallback):
             print("=-------------------------=")
             print(f"{'train' if self.train else 'test'} cumul reward @ {self.num_timesteps}: ", cumulative_reward)
             print(f"{'train' if self.train else 'test'} avg reward @ {self.num_timesteps}: ", cumulative_reward/step)
+
+            #log the cumulative rewards to csv file
+            self.csv_logger[len(self.csv_logger)] = {'train/test': 'train' if self.train else 'test', 'step': self.num_timesteps, 'seed': self.env.unwrapped.seed, 'cumul_reward': cumulative_reward}
         
     
     def _on_training_end(self):
@@ -258,8 +268,8 @@ class PolicyHead:
 
                 #NOTE: potentially uncomment if needed
 
-                reward_callback = RewardValueCallback(env = self.train_env, save_freq = self.model_config['reward_log_freq'], log_dir=f"./logs/{self.algorithm}_{self.data_config['environment_name']}_tensorboard/{self.data_config['observation_space']}/seed_{seed}/", train=True)
-                eval_reward_callback = RewardValueCallback(env = self.eval_env, save_freq = self.model_config['reward_log_freq'], log_dir=f"./logs/{self.algorithm}_{self.data_config['environment_name']}_tensorboard/{self.data_config['observation_space']}/seed_{seed}/", train=False)
+                reward_callback = RewardValueCallback(env = self.train_env, save_freq = self.model_config['reward_log_freq'], log_dir=f"./logs/{self.algorithm}_{self.data_config['environment_name']}_tensorboard/{self.data_config['observation_space']}/seed_{seed}/", csv_log_dir=f"./logs/{self.algorithm}_{self.data_config['environment_name']}_rewards/{self.data_config['observation_space']}/seed_{seed}/", train=True)
+                eval_reward_callback = RewardValueCallback(env = self.eval_env, save_freq = self.model_config['reward_log_freq'], log_dir=f"./logs/{self.algorithm}_{self.data_config['environment_name']}_tensorboard/{self.data_config['observation_space']}/seed_{seed}/", csv_log_dir=f"./logs/{self.algorithm}_{self.data_config['environment_name']}_rewards/{self.data_config['observation_space']}/seed_{seed}/", train=False)
                 gif_callback = GifLoggingCallback(env = self.train_env, save_freq = self.model_config['gif_log_freq'], log_dir = f"./logs/{self.algorithm}_{self.data_config['environment_name']}_policyviz/{self.data_config['observation_space']}/seed_{seed}/", name_prefix = 'policy_gif')
                 checkpoint_callback = CheckpointCallback(save_freq=self.model_config['save_weight_freq'], save_path=f"./logs/{self.algorithm}_{self.data_config['environment_name']}_weights/{self.data_config['observation_space']}/seed_{seed}/", name_prefix=f'{self.algorithm}_seed{seed}_step', save_replay_buffer=True)
 
