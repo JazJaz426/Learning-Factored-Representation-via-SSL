@@ -26,7 +26,7 @@ class RewardValueCallback(BaseCallback):
         self.save_freq = save_freq
         self.train = train
 
-        self.csv_log_dir = os.path.join(logdir, 'episodic_reward_logs.csv')
+        self.csv_log_dir = os.path.join(log_dir, 'episodic_reward_logs.csv')
         self.csv_logger = pd.DataFrame(columns=['train/test', 'step', 'seed', 'cumul_reward'])
 
         os.makedirs(self.log_dir, exist_ok=True)
@@ -35,13 +35,12 @@ class RewardValueCallback(BaseCallback):
         # Save a GIF every save_freq steps
         
         if self.n_calls % self.save_freq == 0:
-            # pdb.set_trace()
             self._log_rewards_and_value()
             self.csv_logger.to_csv(self.csv_log_dir, index=False)
             
 
         return True
-
+    
     
     def _log_rewards_and_value(self):
         # Reset the environment
@@ -60,8 +59,6 @@ class RewardValueCallback(BaseCallback):
                 # Log the value function and reward to TensorBoard
                 cumulative_reward += reward
                 self.writer.add_scalar(f"{'train' if self.train else 'test'} reward per step", reward, self.num_timesteps + step)
-                # self.writer.add_scalar("value per step", value, self.num_timesteps + step)
-
                 step += 1
 
             # Log the cumulative reward
@@ -96,6 +93,7 @@ class GifLoggingCallback(BaseCallback):
         # Save a GIF every save_freq steps
         if self.n_calls % self.save_freq == 0:
             self._create_gif()
+            self._create_value_func()
 
             #TODO: Yichen please help to implement value function logging
             # - may need different ways to get value for DQN vs PPO vs A2C
@@ -105,18 +103,50 @@ class GifLoggingCallback(BaseCallback):
     
     def _create_value_func(self):
         '''extract the value function for a particular observation'''
+        
+        original_obs, info = self.env.reset()
 
-        obs, info = self.env.reset()
+        value_function = np.zeros((self.env.env.unwrapped.width, self.env.env.unwrapped.height)) * np.nan
 
+
+        for w in range(self.env.env.unwrapped.width):
+            for h in range(self.env.env.unwrapped.height):
+
+                obj = self.env.env.unwrapped.grid.get(w, h)
+
+                if obj is None:
+
+                    # place the agent here
+                    self.env.env.unwrapped.agent_pos = (w, h)
+
+                    value_estim = []
+                    
+                    for dir in range(4):
+                        
+                        self.env.env.unwrapped.agent_dir = dir
+                        obs = self.env.env.get_frame(tile_size=8)
+
+                       
+
+                        obs_tensor, vector_env = self.model.policy.obs_to_tensor(obs)
+                        value = self.model.policy.predict_values(obs_tensor).item()
+
+                        
+                        value_estim.append(value)
+
+                    value_function[w, h] = np.mean(value_estim)
+        
+
+        # pdb.set_trace()
 
         #plotting value function over the observation
         fig = plt.figure(frameon=False)
-        
-        plt.imshow(obs)
-        plt.imshow(q_values.transpose(1, 0), alpha=0.5, cmap='viridis')
+        plt.imshow(original_obs)
+        plot_extent = [0, self.env.env.unwrapped.width * 8, self.env.env.unwrapped.height * 8, 0]
+        plt.imshow(value_function, alpha=0.5, cmap='viridis', extent = plot_extent)
         plt.colorbar()
         plt.title(f"Value Function @ Step {self.num_timesteps}")
-        plt.savefig(os.path.join(self.log_dir, f"{self.name_prefix}_value_step_{self.num_timesteps}.gif"))
+        plt.savefig(os.path.join(self.log_dir, f"{self.name_prefix}_value_step_{self.num_timesteps}.png"))
 
 
     def _create_gif(self):
