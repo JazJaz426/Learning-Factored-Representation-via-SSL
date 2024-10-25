@@ -3,3 +3,4 @@ __pycache__/
 events.out.tfevents.*
 data/src
 models/policy_head/logs
+configs
