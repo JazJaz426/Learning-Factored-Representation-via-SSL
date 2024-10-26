@@ -19,7 +19,7 @@ import sys
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 from data.data_augmentor import DataAugmentor
 from data.utils.controlled_reset import CustomEnvReset
-
+from matplotlib import pyplot as plt
 
 '''
 TODO: implement video recording stored in the src folder (only during testing)
@@ -181,12 +181,20 @@ class DataGenerator(gym.Env):
         info['state_dict'] = state
         #add the visual observation into the info for debugging
         info['obs'] = frame
+        #store original reward in case needed
+        info['original_reward'] = reward
+
+        #NOTE: newly added, modify reward to be step-penalty function
+        #reward = 1 - ((abs(state['agent_pos'][0]-state['goal_pos'][0])+abs(state['agent_pos'][1]-state['goal_pos'][1]))/(self.env.unwrapped.height + self.env.unwrapped.width))
+
 
         state = [item for sublist in state.values() for item in (sublist if isinstance(sublist, tuple) else [sublist])] 
 
 
         observation = self._get_obs(image = frame, state = state, factored = factored)
         
+
+       
 
         # #reset in case the environment is done
         # if done:
@@ -307,7 +315,31 @@ if __name__ == '__main__':
     
     obs, info = data_generator.reset()
     obs_t, info_t = data_gen_test.reset()
+
+
+    pdb.set_trace()
+
+    max_steps = 100
+    step = 0
+
+    base_path = os.path.join('./temp/')
+    os.makedirs(base_path, exist_ok=True)
+
+    while step < max_steps:
+
+        act = int(input('Action: '))
+
+        obs, rew, term, trunc, info = data_generator.step(act)
+        
+        print('REWARD: ', rew)
+        print('TERM: ', term)
+
+        img = Image.fromarray(obs)
+        img.save(os.path.join(base_path, f'step_{step}.png'))
+
+        step += 1
     
+    pdb.set_trace()
 
     MAX_STEPS = 5
 
