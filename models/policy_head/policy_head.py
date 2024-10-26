@@ -71,7 +71,7 @@ class RewardValueCallback(BaseCallback):
             print(f"{'train' if self.train else 'test'} avg reward @ {self.num_timesteps}: ", cumulative_reward/step)
 
             #log the cumulative rewards to csv file
-            self.csv_logger[len(self.csv_logger)] = {'train/test': 'train' if self.train else 'test', 'step': self.num_timesteps, 'seed': self.env.unwrapped.seed, 'cumul_reward': cumulative_reward}
+            self.csv_logger[len(self.csv_logger)] = {'train/test': 'train' if self.train else 'test', 'step': self.num_timesteps, 'seed': self.model.seed, 'cumul_reward': cumulative_reward}
         
     
     def _on_training_end(self):
@@ -127,17 +127,21 @@ class GifLoggingCallback(BaseCallback):
                         obs = self.env.env.get_frame(tile_size=8)
 
                        
-
-                        obs_tensor, vector_env = self.model.policy.obs_to_tensor(obs)
-                        value = self.model.policy.predict_values(obs_tensor).item()
-
                         
+                        obs_tensor, vector_env = self.model.policy.obs_to_tensor(obs)
+
+                        if callable(getattr(self.model.policy, "predict_values", None)):
+                            value = self.model.policy.predict_values(obs_tensor).item()
+                        elif callable(getattr(self.model, "q_net", None)):
+                            value = torch.sum(self.model.q_net(obs_tensor), dim=1).item()
+
                         value_estim.append(value)
 
                     value_function[w, h] = np.mean(value_estim)
         
 
-        # pdb.set_trace()
+        #normalize the value function so it is 0-1
+        value_function = value_function / np.sum(value_function)
 
         #plotting value function over the observation
         fig = plt.figure(frameon=False)
