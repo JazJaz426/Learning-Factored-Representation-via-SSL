@@ -88,7 +88,7 @@ class DataGenerator(gym.Env):
         self.controlled_factors = configs['controlled_factors']
 
         #storing the custom reset function if needed
-        self.custom_resetter = CustomEnvReset(configs['environment_name'])
+        self.custom_resetter = CustomEnvReset(configs['environment_name'], configs['state_attributes'])
 
         # Reset the environment to initialize it
         self.env.reset()
