@@ -1,5 +1,5 @@
 policy_head:
-  algorithm: "DQN"  # Options: DQN, PPO, A2C
+  algorithm: "PPO"  # Options: DQN, PPO, A2C
   num_models: 3
   train_interval: 1000000
   # eval_interval: 1
@@ -10,19 +10,19 @@ policy_head:
 
 
   ppo:
-    n_steps: 1000
-    n_epochs: 20
-    learning_rate: 0.0008
+    # n_steps: 1000
+    # n_epochs: 20
+    # learning_rate: 0.0008
     # learning_rate_max: 0.003
     # learning_rate_min: 0.00005
-    batch_size: 64
-    gamma: 0.99
-    gae_lambda: 0.96
-    clip_range: 0.2
-    clip_range_vf: null
-    normalize_advantage: True
-    ent_coef: 0.01
-    max_grad_norm: 0.5
+    # batch_size: 64
+    # gamma: 0.99
+    # gae_lambda: 0.96
+    # clip_range: 0.2
+    # clip_range_vf: null
+    # normalize_advantage: True
+    # ent_coef: 0.01
+    # max_grad_norm: 0.5
     target_kl: null
     verbose: null
     gae_lambda: null
