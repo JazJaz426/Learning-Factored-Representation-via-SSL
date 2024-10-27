@@ -11,7 +11,7 @@ class CustomEnvReset:
 
     def __init__(self, env_name, all_factors):
 
-        custom_reset = {'DoorKey': self._custom_reset_doorkey, 'LavaCrossing': self._custom_reset_lavacrossing, 'FourRooms': self._custom_reset_fourrooms}
+        custom_reset = {'DoorKey': self._custom_reset_doorkey, 'LavaCrossing': self._custom_reset_lavacrossing, 'FourRooms': self._custom_reset_fourrooms, 'Empty': self._custom_reset_empty}
         
         for k in custom_reset.keys():
             if k in env_name:
@@ -207,7 +207,80 @@ class CustomEnvReset:
 
         return env
 
+    def _custom_reset_empty(self, env, width, height, controlled_factors):
 
+        #change the random seed locally 
+        curr_rng = env.unwrapped.np_random
+        local_rng = np.random.default_rng(int(100*random.random()))
+        env.unwrapped.np_random = local_rng
+
+        # Create an empty grid
+        env.unwrapped.grid = Grid(width, height)
+
+        # Generate the surrounding walls
+        env.unwrapped.grid.wall_rect(0, 0, width, height)
+
+
+        # Used locations
+        used_locations = set([(0,0)])
+
+
+        #all set factor values
+        all_factors = {}
+
+
+
+        #insert controlled factors in to the set of all factors
+        for f in controlled_factors.keys():
+            
+            factor = controlled_factors[f]
+
+            if len(factor) == 2:
+
+                #add location to used set
+                used_locations.add(tuple(factor))
+            
+
+            all_factors[f] = factor
+        
+
+        #randomly set the factor values for all other factors: sample until they are not in used locations
+        remaining_factors = self.all_factors - set(list(controlled_factors.keys()))
+
+        for f in remaining_factors:
+
+            if f == 'goal_pos':
+                rand_goal_loc = (0,0)
+
+                while (rand_goal_loc in used_locations) and (isinstance(env.unwrapped.grid.get(rand_goal_loc[0], rand_goal_loc[1]), Wall)):
+                    rand_goal_loc =  (env.unwrapped._rand_int(1, width - 1), env.unwrapped._rand_int(1, height - 1))
+                
+                all_factors[f] = rand_goal_loc
+                used_locations.add(rand_goal_loc)
+            
+            
+            if f == 'agent_pos':
+                rand_agent_loc = (0,0)
+
+                while (rand_agent_loc in used_locations) and (isinstance(env.unwrapped.grid.get(rand_agent_loc[0], rand_agent_loc[1]), Wall)):
+                    rand_agent_loc = (env.unwrapped._rand_int(1, width - 1), env.unwrapped._rand_int(1, height - 1))
+                
+                all_factors[f] = rand_agent_loc
+                used_locations.add(rand_agent_loc)
+
+            if f == 'agent_dir':
+                all_factors[f] = env.unwrapped._rand_int(0, 4)
+
+        # Place a goal square in the bottom-right corner
+        env.unwrapped.put_obj(Goal(), all_factors['goal_pos'][0], all_factors['goal_pos'][1])
+
+        # Place the agent
+        env.unwrapped.agent_pos = all_factors['agent_pos']
+        env.unwrapped.agent_dir = all_factors['agent_dir']
+        
+
+        env.unwrapped.mission = "get to the green goal square"
+        return env
         
     def _custom_reset_fourrooms(self, env, width, height, controlled_factors):
 
