@@ -127,7 +127,9 @@ class GifLoggingCallback(BaseCallback):
             obs, reward, done,___,info = self.env.step(action)
             step += 1
 
-       
+        frame = self.env.render()
+        images.append(frame)
+        
         gif_path = os.path.join(self.log_dir, f"{self.name_prefix}_policy_step_{self.num_timesteps}.gif")
         # pdb.set_trace()
         imageio.mimsave(gif_path, [np.array(img) for img in images], fps=5)
