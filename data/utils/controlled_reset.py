@@ -19,59 +19,76 @@ class CustomEnvReset:
         
         self.all_factors = set(all_factors)
     
-    def check_valid_factors(self, controlled_factors):
+    def check_valid_factors(self, env, controlled_factors):
+        
+        #populate empty set with all controlled factors to check
+        occupied_locations = set([])
+
+        for k in controlled_factors.keys():
             
-            #populate empty set with all controlled factors to check
-            occupied_locations = set([])
+            controlled_val = controlled_factors[k]
 
-            for k in controlled_factors.keys():
-                controlled_val = controlled_factors[k]
+            if type(controlled_val) == list:
 
-                if len(controlled_val) == 2:
+                #check 0: if the location is within bounds
+                if controlled_val[0] >= env.unwrapped.width or controlled_val[0] < 0:
+                    return False, 'controlled_reset.py: Cannot have location outside grid bounds'
+                if controlled_val[1] >= env.unwrapped.height or controlled_val[1] < 0:
+                    return False, 'controlled_reset.py: Cannot have location outside grid bounds'
 
-                    #check 0: if the location is within bounds
-                    if controlled_val[0] >= env.unwrapped.width and controlled_val[0] < 0:
-                        return False
-                    if controlled_val[1] >= env.unwrapped.height and controlled_val[1] < 0:
-                        return False
+                #check 1: if the location is in the wall border
+                if isinstance(env.unwrapped.grid.get(controlled_val[0], controlled_val[1]), Wall):
+                    return False, 'controlled_reset.py: Cannot have location overlapping a wall'
+                
+                #check 2: check if the location is within occupied locations
+                if tuple((controlled_val[0], controlled_val[1])) in occupied_locations:
+                    return False, 'controlled_reset.py: Cannot have location be occupied'
+                
+                #other checks: for door add entire column to set & for any other position add only position the set
+                if k == 'door_pos':
+                    for i in range(env.unwrapped.height):
+                        if (controlled_val[0], i) in occupied_locations:
+                            
+                            return False, 'controlled_reset.py: Cannot have door column overlapping'
+                        occupied_locations.add((controlled_val[0],i))
+                
+                occupied_locations.add((controlled_val[0], controlled_val[1]))
 
-                    #check 1: if the location is in the wall border
-                    if isinstance(env.unwrapped.grid.get(controlled_val[0], controlled_val[1]), Wall):
-                        return False
-                    
-                    #check 2: check if the location is within occupied locations
-                    if tuple((controlled_val[0], cnotrolled_val[1])) in occupied_locations:
-                        return False
-                    
-                    #other checks: for door add entire column to set & for any other position add only position the set
-                    if k == 'door_pos':
-                        for i in range(env.unwrapped.height):
-                            occupied_locations.add((controlled_val[0],i))
-                    
-                    occupied_locations.add((controlled_val[0], controlled_val[1]))
-
-            #check 3: specific to doorkey, if door is open and key is not held
-            if ('door_open' in controlled_factors and controlled_factors['door_open']) and ('door_locked' in controlled_factors and controlled_factors['door_locked']):
-                return False
+        #check 3: specific to doorkey, if door is open and key is not held
+        if ('door_open' in controlled_factors and controlled_factors['door_open']) and ('door_locked' in controlled_factors and controlled_factors['door_locked']):
+            return False, 'controlled_reset.py: Cannot have door open and locked at same time'
+        
+        #check 4: specific to doorkey, if holding key and key_pos is part of controlled factors
+        if ('holding_key' in controlled_factors and controlled_factors['holding_key']) and ('key_pos' in controlled_factors):
             
-            #check 4: specific to doorkey, if holding key and key_pos is part of controlled factors
-            if ('holding_key' in controlled_factors and controlled_factors['holding_key']) and ('key_pos' in controlled_factors):
-                return False
-             
-            return True
+            return False, 'controlled_reset.py: Cannot have agent hold a key but also specify key position'
+        
+        #check 5: specific to doorkey, if door is closed, the key position should be to left or the key should be held
+        if ('door_locked' in controlled_factors and controlled_factors['door_locked']) and ('door_pos' in controlled_factors) and (('agent_pos' in controlled_factors and controlled_factors['agent_pos'][0] < controlled_factors['door_pos'][0] and 'key_pos' in controlled_factors and controlled_factors['key_pos'[0] > controlled_factors['door_pos'][0]]) or ('agent_pos' in controlled_factors and controlled_factors['agent_pos'][0] > controlled_factors['door_pos'][0] and 'key_pos' in controlled_factors and controlled_factors['key_pos'[0] < controlled_factors['door_pos'][0]])):
+            return False, 'controlled_reset.py: Cannot have door be locked yet the key and agent opposite sides of the door'
+         
+        return True, None
 
     def _custom_reset_doorkey(self, env, width, height, controlled_factors):
 
-        #check if the controlled factors is valid or not
-        valid = self.check_valid_factors(controlled_factors)
-
-        if not valid:
-            raise Exception(f'ERROR: the factors {controlled_factors} are not valid')
-        
         #change the random seed locally 
         curr_rng = env.unwrapped.np_random
         local_rng = np.random.default_rng(int(100*random.random()))
         env.unwrapped.np_random = local_rng
+
+        # Create an empty grid
+        env.unwrapped.grid = Grid(width, height)
+
+        # Generate the surrounding walls
+        env.unwrapped.grid.wall_rect(0, 0, width, height)
+
+        #check if the controlled factors is valid or not
+        valid, error = self.check_valid_factors(env, controlled_factors)
+
+        if not valid:
+            raise Exception(f'ERROR: the factors {controlled_factors} are not valid | {error}')
+        
+       
 
         # Used locations
         used_locations = set([(0,0)])
@@ -85,7 +102,7 @@ class CustomEnvReset:
             
             factor = controlled_factors[f]
 
-            if len(factor) == 2:
+            if type(factor) == list:
 
                 #add location to used set
                 used_locations.add(tuple(factor))
@@ -93,14 +110,14 @@ class CustomEnvReset:
                 #add column for door
                 if f == 'door_pos':
                     for i in range(env.unwrapped.height):
-                        used_locations.add((controlled_val[0],i))
+                        used_locations.add((factor[0],i))
             
 
             all_factors[f] = factor
         
 
         #randomly set the factor values for all other factors: sample until they are not in used locations
-        remaining_factors = self.all_factors - set(list(controlled_factors.keys()))
+        remaining_factors = list(sorted(self.all_factors - set(list(controlled_factors.keys()))))
 
         for f in remaining_factors:
 
@@ -142,10 +159,14 @@ class CustomEnvReset:
             if f == 'agent_dir':
                 all_factors[f] = env.unwrapped._rand_int(0, 4)
 
-            if f == 'holding_key':
+            if f == 'holding_key' and ('holding_key' not in all_factors):
                 all_factors[f] = True if random.random()<=0.5 else False
             
             if f == 'key_pos':
+
+                #special case: set the holding_key attribute in case not set before
+                if 'holding_key' not in all_factors:
+                    all_factors['holding_key'] = True if random.random()<=0.5 else False
                 
                 #set key location anywhere if not holding and door open
                 if not all_factors['holding_key'] and all_factors['door_open']:
@@ -153,12 +174,17 @@ class CustomEnvReset:
 
                     while (rand_key_loc  in used_locations) and isinstance(env.unwrapped.grid.get(rand_key_loc[0], rand_key_loc[1]), Wall):
                         rand_agent_loc = (env.unwrapped._rand_int(1, width - 1), env.unwrapped._rand_int(1, height - 1))
+                
                 #set key location to left half if not holding and door not open
                 elif not all_factors['holding_key'] and not all_factors['door_open']:
                     rand_key_loc = (0,0)
 
+                    #align key position so that it is on the same side of the door as the agent is
+                    min_col = 1 if all_factors['agent_pos'][0] < all_factors['door_pos'][0] else all_factors['door_pos'][0] + 1
+                    max_col = all_factors['door_pos'][0] - 1 if all_factors['agent_pos'][0] < all_factors['door_pos'][0] else width-1
+
                     while (rand_key_loc  in used_locations) and isinstance(env.unwrapped.grid.get(rand_key_loc[0], rand_key_loc[1]), Wall):
-                        rand_agent_loc = (env.unwrapped._rand_int(1, all_factors['door_pos']-1), env.unwrapped._rand_int(1, height - 1))
+                        rand_key_loc = (env.unwrapped._rand_int(min_col, max_col), env.unwrapped._rand_int(1, height - 1))
 
                 #set key location to none if holding
                 elif all_factors['holding_key']:
@@ -167,11 +193,6 @@ class CustomEnvReset:
                 
                 all_factors[f] = rand_key_loc
         
-        # Create an empty grid
-        env.unwrapped.grid = Grid(width, height)
-
-        # Generate the surrounding walls
-        env.unwrapped.grid.wall_rect(0, 0, width, height)
 
         # factor 1: add goal position 
         env.unwrapped.put_obj(Goal(), all_factors['goal_pos'][0], all_factors['goal_pos'][1])
@@ -208,7 +229,6 @@ class CustomEnvReset:
         return env
 
     def _custom_reset_empty(self, env, width, height, controlled_factors):
-
         #change the random seed locally 
         curr_rng = env.unwrapped.np_random
         local_rng = np.random.default_rng(int(100*random.random()))
@@ -220,7 +240,12 @@ class CustomEnvReset:
         # Generate the surrounding walls
         env.unwrapped.grid.wall_rect(0, 0, width, height)
 
+        #check if the controlled factors is valid or not
+        valid, error = self.check_valid_factors(env, controlled_factors)
 
+        if not valid:
+            raise Exception(f'ERROR: the factors {controlled_factors} are not valid | {error}')
+        
         # Used locations
         used_locations = set([(0,0)])
 
@@ -235,7 +260,7 @@ class CustomEnvReset:
             
             factor = controlled_factors[f]
 
-            if len(factor) == 2:
+            if type(factor) == list:
 
                 #add location to used set
                 used_locations.add(tuple(factor))
@@ -284,7 +309,6 @@ class CustomEnvReset:
         
     def _custom_reset_fourrooms(self, env, width, height, controlled_factors):
 
-        
         #change the random seed locally 
         curr_rng = env.unwrapped.np_random
         local_rng = np.random.default_rng(int(100*random.random()))
@@ -322,6 +346,13 @@ class CustomEnvReset:
                     env.unwrapped.grid.horz_wall(xL, yB, room_w)
                     pos = (env.unwrapped._rand_int(xL + 1, xR), yB)
                     env.unwrapped.grid.set(*pos, None)
+        
+        #check if the controlled factors is valid or not
+        valid, error = self.check_valid_factors(env, controlled_factors)
+
+        if not valid:
+            raise Exception(f'ERROR: the factors {controlled_factors} are not valid | {error}')
+        
 
         # Used locations
         used_locations = set([(0,0)])
@@ -337,7 +368,7 @@ class CustomEnvReset:
             
             factor = controlled_factors[f]
 
-            if len(factor) == 2:
+            if type(factor) == list:
 
                 #add location to used set
                 used_locations.add(tuple(factor))
@@ -400,9 +431,19 @@ class CustomEnvReset:
         local_rng = np.random.default_rng(int(100*random.random()))
         env.unwrapped.np_random = local_rng
 
-        
+        env.unwrapped.grid = Grid(width, height)
+        env.unwrapped.grid.wall_rect(0, 0, width, height)
 
         assert width >= 5 and height >= 5
+
+        #check if the controlled factors is valid or not
+        valid, error = self.check_valid_factors(env, controlled_factors)
+
+        if not valid:
+            raise Exception(f'ERROR: the factors {controlled_factors} are not valid | {error}')
+        
+
+        
 
         # Used locations
         used_locations = set([(0,0)])
@@ -416,7 +457,7 @@ class CustomEnvReset:
             
             factor = controlled_factors[f]
 
-            if len(factor) == 2:
+            if type(factor) == list:
 
                 #add location to used set
                 used_locations.add(tuple(factor))
@@ -453,8 +494,7 @@ class CustomEnvReset:
 
            
 
-        env.unwrapped.grid = Grid(width, height)
-        env.unwrapped.grid.wall_rect(0, 0, width, height)
+        
 
         # factor 1/2: set agent position and orientation
         env.unwrapped.agent_pos =  all_factors['agent_pos']
