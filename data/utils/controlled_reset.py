@@ -1,6 +1,6 @@
 from minigrid.core.grid import Grid
 from minigrid.core.mission import MissionSpace
-from minigrid.core.world_object import Door, Goal, Key, Lava
+from minigrid.core.world_object import Door, Goal, Key, Lava, Wall
 from minigrid.minigrid_env import MiniGridEnv
 import pdb
 import copy
@@ -9,23 +9,72 @@ import random as random
 
 class CustomEnvReset:
 
-    def __init__(self, env_name):
+    def __init__(self, env_name, all_factors):
 
-        custom_reset = {'DoorKey': self._custom_reset_doorkey, 'LavaCrossing': self._custom_reset_lavacrossing, 'FourRooms': self._custom_reset_fourrooms}
+        custom_reset = {'DoorKey': self._custom_reset_doorkey, 'LavaCrossing': self._custom_reset_lavacrossing, 'FourRooms': self._custom_reset_fourrooms, 'Empty': self._custom_reset_empty}
         
         for k in custom_reset.keys():
             if k in env_name:
                 self.factored_reset = custom_reset[k]
+        
+        self.all_factors = set(all_factors)
+    
+    def check_valid_factors(self, env, controlled_factors):
+        
+        #populate empty set with all controlled factors to check
+        occupied_locations = set([])
+
+        for k in controlled_factors.keys():
+            
+            controlled_val = controlled_factors[k]
+
+            if type(controlled_val) == list:
+
+                #check 0: if the location is within bounds
+                if controlled_val[0] >= env.unwrapped.width or controlled_val[0] < 0:
+                    return False, 'controlled_reset.py: Cannot have location outside grid bounds'
+                if controlled_val[1] >= env.unwrapped.height or controlled_val[1] < 0:
+                    return False, 'controlled_reset.py: Cannot have location outside grid bounds'
+
+                #check 1: if the location is in the wall border
+                if isinstance(env.unwrapped.grid.get(controlled_val[0], controlled_val[1]), Wall):
+                    return False, 'controlled_reset.py: Cannot have location overlapping a wall'
+                
+                #check 2: check if the location is within occupied locations
+                if tuple((controlled_val[0], controlled_val[1])) in occupied_locations:
+                    return False, 'controlled_reset.py: Cannot have location be occupied'
+                
+                #other checks: for door add entire column to set & for any other position add only position the set
+                if k == 'door_pos':
+                    for i in range(env.unwrapped.height):
+                        if (controlled_val[0], i) in occupied_locations:
+                            
+                            return False, 'controlled_reset.py: Cannot have door column overlapping'
+                        occupied_locations.add((controlled_val[0],i))
+                
+                occupied_locations.add((controlled_val[0], controlled_val[1]))
+
+        #check 3: specific to doorkey, if door is open and key is not held
+        if ('door_open' in controlled_factors and controlled_factors['door_open']) and ('door_locked' in controlled_factors and controlled_factors['door_locked']):
+            return False, 'controlled_reset.py: Cannot have door open and locked at same time'
+        
+        #check 4: specific to doorkey, if holding key and key_pos is part of controlled factors
+        if ('holding_key' in controlled_factors and controlled_factors['holding_key']) and ('key_pos' in controlled_factors):
+            
+            return False, 'controlled_reset.py: Cannot have agent hold a key but also specify key position'
+        
+        #check 5: specific to doorkey, if door is closed, the key position should be to left or the key should be held
+        if ('door_locked' in controlled_factors and controlled_factors['door_locked']) and ('door_pos' in controlled_factors) and (('agent_pos' in controlled_factors and controlled_factors['agent_pos'][0] < controlled_factors['door_pos'][0] and 'key_pos' in controlled_factors and controlled_factors['key_pos'[0] > controlled_factors['door_pos'][0]]) or ('agent_pos' in controlled_factors and controlled_factors['agent_pos'][0] > controlled_factors['door_pos'][0] and 'key_pos' in controlled_factors and controlled_factors['key_pos'[0] < controlled_factors['door_pos'][0]])):
+            return False, 'controlled_reset.py: Cannot have door be locked yet the key and agent opposite sides of the door'
+         
+        return True, None
 
     def _custom_reset_doorkey(self, env, width, height, controlled_factors):
-        
+
         #change the random seed locally 
         curr_rng = env.unwrapped.np_random
         local_rng = np.random.default_rng(int(100*random.random()))
         env.unwrapped.np_random = local_rng
-
-        # Used locations
-        used_locations = set([])
 
         # Create an empty grid
         env.unwrapped.grid = Grid(width, height)
@@ -33,78 +82,237 @@ class CustomEnvReset:
         # Generate the surrounding walls
         env.unwrapped.grid.wall_rect(0, 0, width, height)
 
-        
+        #check if the controlled factors is valid or not
+        valid, error = self.check_valid_factors(env, controlled_factors)
 
-        # factor 1: control goal position 
-        goal_pos = (controlled_factors['goal_pos'][0], controlled_factors['goal_pos'][1]) if 'goal_pos' in controlled_factors else (env.unwrapped._rand_int(1, width - 1), env.unwrapped._rand_int(1, height - 1))
-        if goal_pos not in used_locations:
-            env.unwrapped.put_obj(Goal(), goal_pos[0], goal_pos[1])
-            used_locations.add(goal_pos)
-
+        if not valid:
+            raise Exception(f'ERROR: the factors {controlled_factors} are not valid | {error}')
         
-        # factor 2: control door position
-        if 'door_pos' in controlled_factors:
-            splitIdx = controlled_factors['door_pos'][0]
-            doorIdx = controlled_factors['door_pos'][1]
-        else:
-            splitIdx = None; doorIdx = None
-            while (splitIdx, doorIdx) in used_locations or (splitIdx is None or doorIdx is None):
-                splitIdx = env.unwrapped._rand_int(2, width - 2)
-                doorIdx = env.unwrapped._rand_int(1, height - 2)
-        
-        # factor 3: control door locked / unlocked
-        # factor 4: control door open/closed
-        env.unwrapped.grid.vert_wall(splitIdx, 0)
-        door_locked = controlled_factors['door_locked'] if 'door_locked' in controlled_factors else True
-        door_open = controlled_factors['door_open'] if 'door_open' in controlled_factors else False
-        env.unwrapped.put_obj(Door("yellow", is_locked=door_locked, is_open=door_open), splitIdx, doorIdx)
-        used_locations.add((splitIdx, doorIdx))
+       
 
-        # factor 5: control key position 
-        # factor 6: control holding key
-        # pdb.set_trace()
-        if not (('door_locked' in controlled_factors and controlled_factors['door_locked'] is False) or  ('holding_key' in controlled_factors and controlled_factors['holding_key'] is True)):
+        # Used locations
+        used_locations = set([(0,0)])
+
+
+        #all set factor values
+        all_factors = {}
+
+        #insert controlled factors in to the set of all factors
+        for f in controlled_factors.keys():
             
-            if 'key_pos' in controlled_factors:
-                key_top = controlled_factors['key_pos'] 
-                key_size = (1,1) 
-            else:
-                key_top = (0,0)
-                key_size = (splitIdx, height)
+            factor = controlled_factors[f]
 
+            if type(factor) == list:
+
+                #add location to used set
+                used_locations.add(tuple(factor))
+
+                #add column for door
+                if f == 'door_pos':
+                    for i in range(env.unwrapped.height):
+                        used_locations.add((factor[0],i))
+            
+
+            all_factors[f] = factor
+        
+
+        #randomly set the factor values for all other factors: sample until they are not in used locations
+        remaining_factors = list(sorted(self.all_factors - set(list(controlled_factors.keys()))))
+
+        for f in remaining_factors:
+
+            if f == 'goal_pos':
+                rand_goal_loc = (0,0)
+
+                while (rand_goal_loc in used_locations) and (isinstance(env.unwrapped.grid.get(rand_goal_loc[0], rand_goal_loc[1]), Wall)):
+                    rand_goal_loc =  (env.unwrapped._rand_int(1, width - 1), env.unwrapped._rand_int(1, height - 1))
+                
+                all_factors[f] = rand_goal_loc
+                used_locations.add(rand_goal_loc)
+            
+            if f == 'door_pos':
+
+                rand_door_loc = (0,0)
+
+                while (rand_door_loc in used_locations) and (isinstance(env.unwrapped.grid.get(rand_door_loc[0], rand_door_loc[1]), Wall)):
+                    rand_door_loc = (env.unwrapped._rand_int(2, width - 2), env.unwrapped._rand_int(1, height - 2))
+                
+                all_factors[f] = rand_door_loc
+                used_locations.add(rand_door_loc)
+            
+            if f == 'door_locked':
+
+                all_factors[f] = True if random.random() <=0.5 else False
+            
+            if f == 'door_open':
+                all_factors[f] = True if random.random() <= 0.5 else False
+            
+            if f == 'agent_pos':
+                rand_agent_loc = (0,0)
+
+                while (rand_agent_loc in used_locations) and (isinstance(env.unwrapped.grid.get(rand_agent_loc[0], rand_agent_loc[1]), Wall)):
+                    rand_agent_loc = (env.unwrapped._rand_int(1, width - 1), env.unwrapped._rand_int(1, height - 1))
+                
+                all_factors[f] = rand_agent_loc
+                used_locations.add(rand_agent_loc)
+
+            if f == 'agent_dir':
+                all_factors[f] = env.unwrapped._rand_int(0, 4)
+
+            if f == 'holding_key' and ('holding_key' not in all_factors):
+                all_factors[f] = True if random.random()<=0.5 else False
+            
+            if f == 'key_pos':
+
+                #special case: set the holding_key attribute in case not set before
+                if 'holding_key' not in all_factors:
+                    all_factors['holding_key'] = True if random.random()<=0.5 else False
+                
+                #set key location anywhere if not holding and door open
+                if not all_factors['holding_key'] and all_factors['door_open']:
+                    rand_key_loc = (0,0)
+
+                    while (rand_key_loc  in used_locations) and isinstance(env.unwrapped.grid.get(rand_key_loc[0], rand_key_loc[1]), Wall):
+                        rand_agent_loc = (env.unwrapped._rand_int(1, width - 1), env.unwrapped._rand_int(1, height - 1))
+                
+                #set key location to left half if not holding and door not open
+                elif not all_factors['holding_key'] and not all_factors['door_open']:
+                    rand_key_loc = (0,0)
+
+                    #align key position so that it is on the same side of the door as the agent is
+                    min_col = 1 if all_factors['agent_pos'][0] < all_factors['door_pos'][0] else all_factors['door_pos'][0] + 1
+                    max_col = all_factors['door_pos'][0] - 1 if all_factors['agent_pos'][0] < all_factors['door_pos'][0] else width-1
+
+                    while (rand_key_loc  in used_locations) and isinstance(env.unwrapped.grid.get(rand_key_loc[0], rand_key_loc[1]), Wall):
+                        rand_key_loc = (env.unwrapped._rand_int(min_col, max_col), env.unwrapped._rand_int(1, height - 1))
+
+                #set key location to none if holding
+                elif all_factors['holding_key']:
+
+                    rand_key_loc = (None, None)
+                
+                all_factors[f] = rand_key_loc
+        
+
+        # factor 1: add goal position 
+        env.unwrapped.put_obj(Goal(), all_factors['goal_pos'][0], all_factors['goal_pos'][1])
+        
+        # factor 2, 3, 4: add door position, with locked/unlocked and open/closed settings
+        splitIdx = all_factors['door_pos'][0]; doorIdx = all_factors['door_pos'][1]
+        door_locked = all_factors['door_locked']
+        door_open = all_factors['door_open']
+
+        env.unwrapped.grid.vert_wall(splitIdx, 0)
+        env.unwrapped.put_obj(Door("yellow", is_locked=door_locked, is_open=door_open), splitIdx, doorIdx)
+
+        # factor 5: add key position and holding
+        # factor 6: control holding key
+        if all_factors['key_pos'] != (None, None):
+            key_top = all_factors['key_pos']
+            key_size = (1,1)
             env.unwrapped.place_obj(obj=Key("yellow"), top= key_top, size= key_size)
+        
         else:
-            #need to set the agent property as holding key
             env.unwrapped.carrying = Key("yellow")
 
-        # factor 7: control agent position
-        agent_top = tuple(controlled_factors['agent_pos']) if 'agent_pos' in controlled_factors else (0,0)
-        agent_size = (1,1) if 'agent_pos' in controlled_factors else (splitIdx, height)
+        # factor 7, 8: add agent position and direction
+        agent_top = all_factors['agent_pos']
+        agent_size = (1,1)
         env.unwrapped.place_agent(top=agent_top, size=agent_size)
-        
-        #factor 8: control agent direction 
-        if 'agent_dir' in controlled_factors:
-            env.unwrapped.agent_dir = controlled_factors['agent_dir']
-        else:
-            env.unwrapped.agent_dir = env.unwrapped._rand_int(0, 4)
+        env.unwrapped.agent_dir = all_factors['agent_dir']
 
         env.unwrapped.mission = "use the key to open the door and then get to the goal"
+        
         #reset the original rng after resetting env
         env.unwrapped.np_random = curr_rng
 
         return env
 
-
-        
-    def _custom_reset_fourrooms(self, env, width, height, controlled_factors):
-        
+    def _custom_reset_empty(self, env, width, height, controlled_factors):
         #change the random seed locally 
         curr_rng = env.unwrapped.np_random
         local_rng = np.random.default_rng(int(100*random.random()))
         env.unwrapped.np_random = local_rng
+
+        # Create an empty grid
+        env.unwrapped.grid = Grid(width, height)
+
+        # Generate the surrounding walls
+        env.unwrapped.grid.wall_rect(0, 0, width, height)
+
+        #check if the controlled factors is valid or not
+        valid, error = self.check_valid_factors(env, controlled_factors)
+
+        if not valid:
+            raise Exception(f'ERROR: the factors {controlled_factors} are not valid | {error}')
+        
+        # Used locations
+        used_locations = set([(0,0)])
+
+
+        #all set factor values
+        all_factors = {}
+
+
+
+        #insert controlled factors in to the set of all factors
+        for f in controlled_factors.keys():
+            
+            factor = controlled_factors[f]
+
+            if type(factor) == list:
+
+                #add location to used set
+                used_locations.add(tuple(factor))
+            
+
+            all_factors[f] = factor
         
 
-        used_locations = set([])
+        #randomly set the factor values for all other factors: sample until they are not in used locations
+        remaining_factors = self.all_factors - set(list(controlled_factors.keys()))
+
+        for f in remaining_factors:
+
+            if f == 'goal_pos':
+                rand_goal_loc = (0,0)
+
+                while (rand_goal_loc in used_locations) and (isinstance(env.unwrapped.grid.get(rand_goal_loc[0], rand_goal_loc[1]), Wall)):
+                    rand_goal_loc =  (env.unwrapped._rand_int(1, width - 1), env.unwrapped._rand_int(1, height - 1))
+                
+                all_factors[f] = rand_goal_loc
+                used_locations.add(rand_goal_loc)
+            
+            
+            if f == 'agent_pos':
+                rand_agent_loc = (0,0)
+
+                while (rand_agent_loc in used_locations) and (isinstance(env.unwrapped.grid.get(rand_agent_loc[0], rand_agent_loc[1]), Wall)):
+                    rand_agent_loc = (env.unwrapped._rand_int(1, width - 1), env.unwrapped._rand_int(1, height - 1))
+                
+                all_factors[f] = rand_agent_loc
+                used_locations.add(rand_agent_loc)
+
+            if f == 'agent_dir':
+                all_factors[f] = env.unwrapped._rand_int(0, 4)
+
+        # Place a goal square in the bottom-right corner
+        env.unwrapped.put_obj(Goal(), all_factors['goal_pos'][0], all_factors['goal_pos'][1])
+
+        # Place the agent
+        env.unwrapped.agent_pos = all_factors['agent_pos']
+        env.unwrapped.agent_dir = all_factors['agent_dir']
+        
+
+        env.unwrapped.mission = "get to the green goal square"
+        return env
+        
+    def _custom_reset_fourrooms(self, env, width, height, controlled_factors):
+
+        #change the random seed locally 
+        curr_rng = env.unwrapped.np_random
+        local_rng = np.random.default_rng(int(100*random.random()))
+        env.unwrapped.np_random = local_rng
 
         # Create the grid
         env.unwrapped.grid = Grid(width, height)
@@ -138,34 +346,77 @@ class CustomEnvReset:
                     env.unwrapped.grid.horz_wall(xL, yB, room_w)
                     pos = (env.unwrapped._rand_int(xL + 1, xR), yB)
                     env.unwrapped.grid.set(*pos, None)
-
-        # factor 1: control agent position
-        agent_top = tuple(controlled_factors['agent_pos']) if 'agent_pos' in controlled_factors else None
-        agent_size = (1,1) if 'agent_pos' in controlled_factors else None
-        if 'agent_pos' in controlled_factors and agent_top not in used_locations:
-            
-            env.unwrapped.place_agent(top=agent_top, size=agent_size)
-            used_locations.add(agent_top)
-
-        else:
-            agent_pos = env.unwrapped.place_agent()
-            used_locations.add(agent_pos)
-
-        # pdb.set_trace()
-        #factor 2: control the agent direction
-        if 'agent_dir' in controlled_factors:
-            env.unwrapped.agent_dir = controlled_factors['agent_dir']
-        else:
-            env.unwrapped.agent_dir = env.unwrapped._rand_int(0, 4)
-
-        #factor 3: control the goal position
-        if 'goal_pos' in controlled_factors and (tuple(controlled_factors['goal_pos']) not in used_locations):
-            goal = Goal()
-            env.unwrapped.put_obj(goal, *tuple(controlled_factors['goal_pos']))
-            goal.init_pos, goal.cur_pos = tuple(controlled_factors['goal_pos']), tuple(controlled_factors['goal_pos'])
-        else:
-            env.unwrapped.place_obj(Goal())
         
+        #check if the controlled factors is valid or not
+        valid, error = self.check_valid_factors(env, controlled_factors)
+
+        if not valid:
+            raise Exception(f'ERROR: the factors {controlled_factors} are not valid | {error}')
+        
+
+        # Used locations
+        used_locations = set([(0,0)])
+
+
+        #all set factor values
+        all_factors = {}
+
+
+
+        #insert controlled factors in to the set of all factors
+        for f in controlled_factors.keys():
+            
+            factor = controlled_factors[f]
+
+            if type(factor) == list:
+
+                #add location to used set
+                used_locations.add(tuple(factor))
+            
+
+            all_factors[f] = factor
+        
+
+        #randomly set the factor values for all other factors: sample until they are not in used locations
+        remaining_factors = self.all_factors - set(list(controlled_factors.keys()))
+
+        for f in remaining_factors:
+
+            if f == 'goal_pos':
+                rand_goal_loc = (0,0)
+
+                while (rand_goal_loc in used_locations) and (isinstance(env.unwrapped.grid.get(rand_goal_loc[0], rand_goal_loc[1]), Wall)):
+                    rand_goal_loc =  (env.unwrapped._rand_int(1, width - 1), env.unwrapped._rand_int(1, height - 1))
+                
+                all_factors[f] = rand_goal_loc
+                used_locations.add(rand_goal_loc)
+            
+            
+            if f == 'agent_pos':
+                rand_agent_loc = (0,0)
+
+                while (rand_agent_loc in used_locations) and (isinstance(env.unwrapped.grid.get(rand_agent_loc[0], rand_agent_loc[1]), Wall)):
+                    rand_agent_loc = (env.unwrapped._rand_int(1, width - 1), env.unwrapped._rand_int(1, height - 1))
+                
+                all_factors[f] = rand_agent_loc
+                used_locations.add(rand_agent_loc)
+
+            if f == 'agent_dir':
+                all_factors[f] = env.unwrapped._rand_int(0, 4)
+
+
+        
+
+        # factor 1 / 2: set agent position and direction
+        agent_top = all_factors['agent_pos']
+        agent_size = (1,1)
+        env.unwrapped.place_agent(top=agent_top, size=agent_size)
+        env.unwrapped.agent_dir = all_factors['agent_dir']
+        
+
+        #factor 3: set the goal position
+        env.unwrapped.put_obj(Goal(), *all_factors['goal_pos'])
+       
         env.unwrapped.mission = "reach the goal"
 
         #reset the original rng after resetting env
@@ -180,39 +431,78 @@ class CustomEnvReset:
         local_rng = np.random.default_rng(int(100*random.random()))
         env.unwrapped.np_random = local_rng
 
-        used_locations = set([])
+        env.unwrapped.grid = Grid(width, height)
+        env.unwrapped.grid.wall_rect(0, 0, width, height)
 
         assert width >= 5 and height >= 5
 
-        env.unwrapped.grid = Grid(width, height)
+        #check if the controlled factors is valid or not
+        valid, error = self.check_valid_factors(env, controlled_factors)
 
-        env.unwrapped.grid.wall_rect(0, 0, width, height)
-
-        # factor 1: agent position
-        if 'agent_pos' in controlled_factors and tuple(controlled_factors['agent_pos']) not in used_locations:
-            agent_pos = tuple(controlled_factors['agent_pos'])
-        else:
-            agent_pos = env.unwrapped.place_agent()
-            
-        env.unwrapped.agent_pos =  agent_pos
-        used_locations.add(agent_pos)
-
-        # factor 2: agent orientation
-        env.unwrapped.agent_dir = controlled_factors['agent_dir'] if 'agent_dir' in controlled_factors else env.unwrapped._rand_int(0, 4)
-
-
-        # factor 3: goal position
-        if 'goal_pos' in controlled_factors and tuple(controlled_factors['goal_pos']) not in used_locations:
-            goal_pos = tuple(controlled_factors['goal_pos'])
-        else:
-            goal_pos = None
-            
-            while goal_pos is None or goal_pos in used_locations:
-                goal_pos = (env.unwrapped._rand_int(0, width-2), env.unwrapped._rand_int(0, height-2))
+        if not valid:
+            raise Exception(f'ERROR: the factors {controlled_factors} are not valid | {error}')
+        
 
         
-        env.unwrapped.goal_pos = goal_pos
-        used_locations.add(goal_pos)
+
+        # Used locations
+        used_locations = set([(0,0)])
+
+
+        #all set factor values
+        all_factors = {}
+
+        #insert controlled factors in to the set of all factors
+        for f in controlled_factors.keys():
+            
+            factor = controlled_factors[f]
+
+            if type(factor) == list:
+
+                #add location to used set
+                used_locations.add(tuple(factor))
+            
+
+            all_factors[f] = factor
+        
+
+        #randomly set the factor values for all other factors: sample until they are not in used locations
+        remaining_factors = self.all_factors - set(list(controlled_factors.keys()))
+
+        for f in remaining_factors:
+
+            if f == 'goal_pos':
+                rand_goal_loc = (0,0)
+
+                while (rand_goal_loc in used_locations) and (isinstance(env.unwrapped.grid.get(rand_goal_loc[0], rand_goal_loc[1]), Wall)):
+                    rand_goal_loc =  (env.unwrapped._rand_int(1, width - 1), env.unwrapped._rand_int(1, height - 1))
+                
+                all_factors[f] = rand_goal_loc
+                used_locations.add(rand_goal_loc)
+            
+            if f == 'agent_pos':
+                rand_agent_loc = (0,0)
+
+                while (rand_agent_loc in used_locations) and (isinstance(env.unwrapped.grid.get(rand_agent_loc[0], rand_agent_loc[1]), Wall)):
+                    rand_agent_loc = (env.unwrapped._rand_int(1, width - 1), env.unwrapped._rand_int(1, height - 1))
+                
+                all_factors[f] = rand_agent_loc
+                used_locations.add(rand_agent_loc)
+
+            if f == 'agent_dir':
+                all_factors[f] = env.unwrapped._rand_int(0, 4)
+
+           
+
+        
+
+        # factor 1/2: set agent position and orientation
+        env.unwrapped.agent_pos =  all_factors['agent_pos']
+        env.unwrapped.agent_dir = all_factors['agent_dir'] 
+
+
+        # factor 3: set goal position
+        env.unwrapped.goal_pos = all_factors['goal_pos']
         env.unwrapped.put_obj(Goal(), *env.unwrapped.goal_pos)
 
         # Generate and store random gap position

@@ -15,9 +15,10 @@ import gymnasium as gym
 import torch
 from matplotlib import pyplot as plt
 import re
+import pandas as pd
 
 class RewardValueCallback(BaseCallback):
-    def __init__(self, env: gym.Env, save_freq: int, log_dir: str, verbose=0, max_steps: int = 200, train=True):
+    def __init__(self, env: gym.Env, save_freq: int, log_dir: str, csv_log_dir: str, verbose=0, max_steps: int = 200, train=True):
         super(RewardValueCallback, self).__init__(verbose)
         self.log_dir = log_dir
         self.writer = SummaryWriter(log_dir)
@@ -26,16 +27,21 @@ class RewardValueCallback(BaseCallback):
         self.save_freq = save_freq
         self.train = train
 
+        self.csv_log_dir = os.path.join(log_dir, 'episodic_reward_logs.csv')
+        self.csv_logger = pd.DataFrame(columns=['train/test', 'step', 'seed', 'cumul_reward'])
+
         os.makedirs(self.log_dir, exist_ok=True)
 
     def _on_step(self) -> bool:
         # Save a GIF every save_freq steps
         
         if self.n_calls % self.save_freq == 0:
-            # pdb.set_trace()
             self._log_rewards_and_value()
-        return True
+            self.csv_logger.to_csv(self.csv_log_dir, index=False)
+            
 
+        return True
+    
     
     def _log_rewards_and_value(self):
         # Reset the environment
@@ -52,6 +58,7 @@ class RewardValueCallback(BaseCallback):
                 obs, rewards, dones, __, infos = self.env.step(actions)
 
                 # Log the value function and reward to TensorBoard
+
                 cumulative_reward += rewards
                 self.writer.add_scalar(f"{'train' if self.train else 'test'} reward per step", rewards, self.num_timesteps + step)
                 # self.writer.add_scalar("value per step", value, self.num_timesteps + step)
@@ -66,6 +73,9 @@ class RewardValueCallback(BaseCallback):
             print("=-------------------------=")
             print(f"{'train' if self.train else 'test'} cumul reward @ {self.num_timesteps}: ", cumulative_reward)
             print(f"{'train' if self.train else 'test'} avg reward @ {self.num_timesteps}: ", cumulative_reward/step)
+
+            #log the cumulative rewards to csv file
+            self.csv_logger[len(self.csv_logger)] = {'train/test': 'train' if self.train else 'test', 'step': self.num_timesteps, 'seed': self.model.seed, 'cumul_reward': cumulative_reward}
         
     
     def _on_training_end(self):
@@ -87,6 +97,7 @@ class GifLoggingCallback(BaseCallback):
         # Save a GIF every save_freq steps
         if self.n_calls % self.save_freq == 0:
             self._create_gif()
+            self._create_value_func()
 
             #TODO: Yichen please help to implement value function logging
             # - may need different ways to get value for DQN vs PPO vs A2C
@@ -96,18 +107,54 @@ class GifLoggingCallback(BaseCallback):
     
     def _create_value_func(self):
         '''extract the value function for a particular observation'''
+        
+        original_obs, info = self.env.reset()
 
-        obs, info = self.env.reset()
+        value_function = np.zeros((self.env.env.unwrapped.width, self.env.env.unwrapped.height)) * np.nan
 
+
+        for w in range(self.env.env.unwrapped.width):
+            for h in range(self.env.env.unwrapped.height):
+
+                obj = self.env.env.unwrapped.grid.get(w, h)
+
+                if obj is None:
+
+                    # place the agent here
+                    self.env.env.unwrapped.agent_pos = (w, h)
+
+                    value_estim = []
+                    
+                    for dir in range(4):
+                        
+                        self.env.env.unwrapped.agent_dir = dir
+                        obs = self.env.env.get_frame(tile_size=8)
+
+                       
+                        
+                        obs_tensor, vector_env = self.model.policy.obs_to_tensor(obs)
+
+                        if callable(getattr(self.model.policy, "predict_values", None)):
+                            value = self.model.policy.predict_values(obs_tensor).item()
+                        elif callable(getattr(self.model, "q_net", None)):
+                            value = torch.sum(self.model.q_net(obs_tensor), dim=1).item()
+
+                        value_estim.append(value)
+
+                    value_function[w, h] = np.mean(value_estim)
+        
+
+        #normalize the value function so it is 0-1
+        value_function = value_function / np.sum(value_function)
 
         #plotting value function over the observation
         fig = plt.figure(frameon=False)
-        
-        plt.imshow(obs)
-        plt.imshow(q_values.transpose(1, 0), alpha=0.5, cmap='viridis')
+        plt.imshow(original_obs)
+        plot_extent = [0, self.env.env.unwrapped.width * 8, self.env.env.unwrapped.height * 8, 0]
+        plt.imshow(value_function, alpha=0.5, cmap='viridis', extent = plot_extent)
         plt.colorbar()
         plt.title(f"Value Function @ Step {self.num_timesteps}")
-        plt.savefig(os.path.join(self.log_dir, f"{self.name_prefix}_value_step_{self.num_timesteps}.gif"))
+        plt.savefig(os.path.join(self.log_dir, f"{self.name_prefix}_value_step_{self.num_timesteps}.png"))
 
 
     def _create_gif(self):
@@ -127,9 +174,11 @@ class GifLoggingCallback(BaseCallback):
             obs, reward, done,___,info = self.env.step(action)
             step += 1
 
+        #save the final frame of +ve reward
         frame = self.env.render()
         images.append(frame)
-        
+       
+
         gif_path = os.path.join(self.log_dir, f"{self.name_prefix}_policy_step_{self.num_timesteps}.gif")
         # pdb.set_trace()
         imageio.mimsave(gif_path, [np.array(img) for img in images], fps=5)
@@ -216,7 +265,7 @@ class PolicyHead:
                     env=self.train_env,
                     seed=model_num,
                     **ppo_params,
-                    tensorboard_log=f"./{self.algorithm}_{self.data_config['environment_name']}_tensorboard/{self.data_config['observation_space']}/seed_{model_num}/"
+                    tensorboard_log=f"./logs/{self.algorithm}_{self.data_config['environment_name']}_tensorboard/{self.data_config['observation_space']}/seed_{model_num}/"
                 )
             elif self.algorithm == "DQN":
                 dqn_params = {k: v for k, v in self.model_config['dqn'].items() if v is not None}
@@ -225,7 +274,7 @@ class PolicyHead:
                     env=self.train_env,
                     seed=model_num,
                     **dqn_params,
-                    tensorboard_log=f"./{self.algorithm}_{self.data_config['environment_name']}_tensorboard/{self.data_config['observation_space']}/seed_{model_num}/"
+                    tensorboard_log=f"./logs/{self.algorithm}_{self.data_config['environment_name']}_tensorboard/{self.data_config['observation_space']}/seed_{model_num}/"
                 )
             elif self.algorithm == "A2C":
                 a2c_params = {k: v for k, v in self.model_config['a2c'].items() if v is not None}
@@ -234,7 +283,7 @@ class PolicyHead:
                     env=self.train_env,
                     seed=model_num,
                     **a2c_params,
-                    tensorboard_log=f"./{self.algorithm}_{self.data_config['environment_name']}_tensorboard/{self.data_config['observation_space']}/seed_{model_num}/"
+                    tensorboard_log=f"./logs/{self.algorithm}_{self.data_config['environment_name']}_tensorboard/{self.data_config['observation_space']}/seed_{model_num}/"
                 )
             else:
                 raise ValueError(f"Unsupported RL algorithm: {self.algorithm}")
@@ -250,14 +299,16 @@ class PolicyHead:
         iteration = 0
         for seed in self.models.keys():
 
-            if os.path.exists(f"./{self.algorithm}_{self.data_config['environment_name']}_weights/{self.data_config['observation_space']}/seed_{seed}") and len(os.listdir(f"./{self.algorithm}_{self.data_config['environment_name']}_weights/{self.data_config['observation_space']}/seed_{seed}")) > 0:
-                latest_weight = list(sorted(os.listdir(f"./{self.algorithm}_{self.data_config['environment_name']}_weights/{self.data_config['observation_space']}/seed_{seed}")))
+            if os.path.exists(f"./logs/{self.algorithm}_{self.data_config['environment_name']}_weights/{self.data_config['observation_space']}/seed_{seed}") and len(os.listdir(f"./logs/{self.algorithm}_{self.data_config['environment_name']}_weights/{self.data_config['observation_space']}/seed_{seed}")) > 0:
+                latest_weight = list(sorted(os.listdir(f"./logs/{self.algorithm}_{self.data_config['environment_name']}_weights/{self.data_config['observation_space']}/seed_{seed}")))
                 
                 latest_weight = max(latest_weight, key=lambda f: int(re.search(r'\d+', f.split('step_')[1]).group()))
 
-                final_path = os.path.join(f"./{self.algorithm}_{self.data_config['environment_name']}_weights/{self.data_config['observation_space']}/seed_{seed}", latest_weight.split('.')[0])
+                final_path = os.path.join(f"./logs/{self.algorithm}_{self.data_config['environment_name']}_weights/{self.data_config['observation_space']}/seed_{seed}", latest_weight.split('.')[0])
 
                 self.models[seed].load(path = final_path, env = self.train_env)
+
+            
 
             
         for seed, model in self.models.items():
@@ -265,6 +316,7 @@ class PolicyHead:
             #NOTE: potentially uncomment if needed
             # new_logger = configure(f"./{self.algorithm}_tensorboard/model_{seed}", ["stdout", "tensorboard"])
             # model.set_logger(new_logger)
+
 
             reward_callback = RewardValueCallback(env = self.test_env, save_freq = self.model_config['reward_log_freq'], log_dir=f"./{self.algorithm}_{self.data_config['environment_name']}_tensorboard/{self.data_config['observation_space']}/seed_{seed}/", train=True)
             eval_reward_callback = RewardValueCallback(env = self.eval_env, save_freq = self.model_config['reward_log_freq'], log_dir=f"./{self.algorithm}_{self.data_config['environment_name']}_tensorboard/{self.data_config['observation_space']}/seed_{seed}/", train=False)
@@ -330,11 +382,9 @@ def train_and_evaluate_policy_old(self, total_timestamps):
         for seed, model in self.models.items():
 
             #NOTE: potentially uncomment if needed
-            # new_logger = configure(f"./{self.algorithm}_tensorboard/model_{seed}", ["stdout", "tensorboard"])
-            # model.set_logger(new_logger)
 
-            reward_callback = RewardValueCallback(env = self.train_env, save_freq = self.model_config['reward_log_freq'], log_dir=f"./{self.algorithm}_tensorboard/{self.data_config['observation_space']}/seed_{seed}/")
-            gif_callback = GifLoggingCallback(env = self.train_env, save_freq = self.model_config['gif_log_freq'], log_dir = f"./{self.algorithm}_policyviz/{self.data_config['observation_space']}/seed_{seed}/", name_prefix = 'policy_gif')
+            reward_callback = RewardValueCallback(env = self.train_env, save_freq = self.model_config['reward_log_freq'], log_dir=f"./logs/{self.algorithm}_tensorboard/{self.data_config['observation_space']}/seed_{seed}/")
+            gif_callback = GifLoggingCallback(env = self.train_env, save_freq = self.model_config['gif_log_freq'], log_dir = f"./logs/{self.algorithm}_policyviz/{self.data_config['observation_space']}/seed_{seed}/", name_prefix = 'policy_gif')
             # model.learn(total_timesteps=train_interval, callback=callback)
             # Create the callback list
             callback = CallbackList([reward_callback, gif_callback])
