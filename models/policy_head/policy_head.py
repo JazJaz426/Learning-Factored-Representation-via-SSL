@@ -1,6 +1,7 @@
 import yaml
 from stable_baselines3 import PPO, DQN, A2C
 from stable_baselines3.common.logger import configure
+from stable_baselines3.common.vec_env import SubprocVecEnv
 import numpy as np
 import sys
 import os
@@ -53,12 +54,15 @@ class RewardValueCallback(BaseCallback):
 
             while not done and step < self.max_steps:
                 # Predict action and get value function (self.model.predict returns the action and value)
-                action,_states = self.model.predict(obs, deterministic=True)
-                obs, reward, done, __, info = self.env.step(action)
+                actions, _states = self.model.predict(obs, deterministic=True)
+                obs, rewards, dones, __, infos = self.env.step(actions)
 
                 # Log the value function and reward to TensorBoard
-                cumulative_reward += reward
-                self.writer.add_scalar(f"{'train' if self.train else 'test'} reward per step", reward, self.num_timesteps + step)
+
+                cumulative_reward += rewards
+                self.writer.add_scalar(f"{'train' if self.train else 'test'} reward per step", rewards, self.num_timesteps + step)
+                # self.writer.add_scalar("value per step", value, self.num_timesteps + step)
+
                 step += 1
 
             # Log the cumulative reward
@@ -174,6 +178,7 @@ class GifLoggingCallback(BaseCallback):
         frame = self.env.render()
         images.append(frame)
        
+
         gif_path = os.path.join(self.log_dir, f"{self.name_prefix}_policy_step_{self.num_timesteps}.gif")
         # pdb.set_trace()
         imageio.mimsave(gif_path, [np.array(img) for img in images], fps=5)
@@ -193,7 +198,13 @@ class GifLoggingCallback(BaseCallback):
         self.writer.close()
 
 class PolicyHead:
-    def __init__(self, train_env, eval_env, model_config_path, data_config_path):
+    def __init__(self, 
+                 train_env, 
+                 test_env,
+                 eval_env, 
+                 model_config_path, 
+                 data_config_path
+        ):
         self.model_config = self.load_config(os.path.join(os.path.dirname(__file__), '../..', model_config_path))['policy_head']
         self.data_config = self.load_config(os.path.join(os.path.dirname(__file__), '../..', data_config_path))
         self.algorithm = self.model_config['algorithm']
@@ -202,12 +213,13 @@ class PolicyHead:
 
         print('POLICY NAME: ', self.policy_name)
         self.train_env = train_env
+        self.test_env = test_env
         self.eval_env = eval_env
         self.models = self.create_models(num_models=self.model_config['num_models'])
 
         #check that critical configs for test and train are equal 
-        if not ( (self.train_env.observation_type == self.eval_env.observation_type) and isinstance(self.eval_env.env.unwrapped, type(self.train_env.env.unwrapped)) ):
-            raise Exception("ERROR: observaiton type and environment name need to be same for train and eval configs")
+        assert (self.train_env.observation_space == self.eval_env.observation_space), \
+            f"ERROR: observaiton type {self.train_env.observation_space} and environment {self.eval_env.observation_space} need to be same for train and eval configs"
 
     def linear_schedule(self, initial_value: float):
         """
@@ -296,24 +308,26 @@ class PolicyHead:
 
                 self.models[seed].load(path = final_path, env = self.train_env)
 
-        while iteration * (train_interval) < total_timestamps:
             
-            for seed, model in self.models.items():
 
-                #NOTE: potentially uncomment if needed
+            
+        for seed, model in self.models.items():
 
-                reward_callback = RewardValueCallback(env = self.train_env, save_freq = self.model_config['reward_log_freq'], log_dir=f"./logs/{self.algorithm}_{self.data_config['environment_name']}_tensorboard/{self.data_config['observation_space']}/seed_{seed}/", csv_log_dir=f"./logs/{self.algorithm}_{self.data_config['environment_name']}_rewards/{self.data_config['observation_space']}/seed_{seed}/", train=True)
-                eval_reward_callback = RewardValueCallback(env = self.eval_env, save_freq = self.model_config['reward_log_freq'], log_dir=f"./logs/{self.algorithm}_{self.data_config['environment_name']}_tensorboard/{self.data_config['observation_space']}/seed_{seed}/", csv_log_dir=f"./logs/{self.algorithm}_{self.data_config['environment_name']}_rewards/{self.data_config['observation_space']}/seed_{seed}/", train=False)
-                gif_callback = GifLoggingCallback(env = self.train_env, save_freq = self.model_config['gif_log_freq'], log_dir = f"./logs/{self.algorithm}_{self.data_config['environment_name']}_policyviz/{self.data_config['observation_space']}/seed_{seed}/", name_prefix = 'policy_gif')
-                checkpoint_callback = CheckpointCallback(save_freq=self.model_config['save_weight_freq'], save_path=f"./logs/{self.algorithm}_{self.data_config['environment_name']}_weights/{self.data_config['observation_space']}/seed_{seed}/", name_prefix=f'{self.algorithm}_seed{seed}_step', save_replay_buffer=True)
+            #NOTE: potentially uncomment if needed
+            # new_logger = configure(f"./{self.algorithm}_tensorboard/model_{seed}", ["stdout", "tensorboard"])
+            # model.set_logger(new_logger)
 
-                # Create the callback list
-                callback = CallbackList([reward_callback, eval_reward_callback, gif_callback, checkpoint_callback])
 
-                model.learn(total_timesteps=train_interval, tb_log_name=f'{self.algorithm}_{seed}', progress_bar = True, reset_num_timesteps=False, callback = callback)
-                # model.save(path=f"./logs/{self.algorithm}_weights/seed_{seed}/{self.algortihm}_seed{seed}_step{self.model.num_timesteps}")
+            reward_callback = RewardValueCallback(env = self.test_env, save_freq = self.model_config['reward_log_freq'], log_dir=f"./{self.algorithm}_{self.data_config['environment_name']}_tensorboard/{self.data_config['observation_space']}/seed_{seed}/", train=True)
+            eval_reward_callback = RewardValueCallback(env = self.eval_env, save_freq = self.model_config['reward_log_freq'], log_dir=f"./{self.algorithm}_{self.data_config['environment_name']}_tensorboard/{self.data_config['observation_space']}/seed_{seed}/", train=False)
+            gif_callback = GifLoggingCallback(env = self.test_env, save_freq = self.model_config['gif_log_freq'], log_dir = f"./{self.algorithm}_{self.data_config['environment_name']}_policyviz/{self.data_config['observation_space']}/seed_{seed}/", name_prefix = 'policy_gif')
+            checkpoint_callback = CheckpointCallback(save_freq=self.model_config['save_weight_freq'], save_path=f"./{self.algorithm}_{self.data_config['environment_name']}_weights/{self.data_config['observation_space']}/seed_{seed}/", name_prefix=f'{self.algorithm}_seed{seed}_step', save_replay_buffer=True)
 
-            iteration += 1
+            # Create the callback list
+            callback = CallbackList([reward_callback, eval_reward_callback, gif_callback, checkpoint_callback])
+
+            model.learn(total_timesteps=train_interval, tb_log_name=f'{self.algorithm}_{seed}', progress_bar = True, reset_num_timesteps=False, callback = callback)
+            # model.save(path=f"./{self.algorithm}_weights/seed_{seed}/{self.algortihm}_seed{seed}_step{self.model.num_timesteps}")
 
 
 
@@ -336,12 +350,23 @@ class PolicyHead:
     def tune_hyperparameter():
         pass
 
+
+def gen_env(seed):
+    env = DataGenerator('config.yaml')
+    env.reset(seed=seed)
+    return env
+
 if __name__ == '__main__':
-    
-    policy_head = PolicyHead(DataGenerator('config.yaml'), DataGenerator('config_test.yaml'), 'configs/models/config.yaml', 'configs/data_generator/config.yaml')
+    print(DataGenerator('config.yaml').observation_space)
+    print(DataGenerator('config_test.yaml').observation_space)
+    policy_head = PolicyHead(
+        SubprocVecEnv([lambda: gen_env(i) for i in range(4)]), 
+        DataGenerator('config.yaml'), 
+        DataGenerator('config_test.yaml'), 
+        'configs/models/config.yaml', 
+        'configs/data_generator/config.yaml'
+    )
     policy_head.train_and_evaluate_policy(total_timestamps=1000000)
-
-
 
 
 
