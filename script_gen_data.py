@@ -154,6 +154,8 @@ class GenerateDataset:
                                     state_dict1=info_prime["state_dict"]
                                     )
 
+
+
     def _set_data_generator_reset_type(self, reset_type):
         assert reset_type in ["custom", "random", "default"]
         self.data_generator.reset_type = reset_type
