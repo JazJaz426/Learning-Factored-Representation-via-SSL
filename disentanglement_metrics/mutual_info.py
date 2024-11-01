@@ -81,17 +81,13 @@ def mig(factors, codes, continuous_factors=True, nb_bins=10):
     codes = minmax_scale(codes)  # normalize in [0, 1] all columns
     codes = get_bin_index(codes, nb_bins)  # quantize values and get indexes
 
-    print(nb_factors,nb_codes)
     # compute mutual information matrix
     mi_matrix = np.zeros((nb_factors, nb_codes))
     for f in range(nb_factors):
         for c in range(nb_codes):
             mi_matrix[f, c] = get_mutual_information(factors[:, f], codes[:, c])
 
-    print(mi_matrix)
-
     entropy = discrete_entropy(factors) # !?
-    print(entropy)
 
     # compute the mean gap for all factors
     sum_gap = 0
