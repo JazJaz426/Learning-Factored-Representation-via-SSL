@@ -148,7 +148,7 @@ class GifLoggingCallback(BaseCallback):
         
         pdb.set_trace()
         #normalize the value function so it is 0-1
-        value_function = value_function / np.sum(value_function)
+        value_function = value_function / np.nansum(value_function)
 
         #plotting value function over the observation
         fig = plt.figure(frameon=False)
@@ -202,8 +202,8 @@ class GifLoggingCallback(BaseCallback):
 
 class PolicyHead:
     def __init__(self, 
-                 train_env, 
-                 test_env,
+                 parallel_train_env, 
+                 train_env,
                  eval_env, 
                  model_config_path, 
                  data_config_path
@@ -215,8 +215,8 @@ class PolicyHead:
         self.policy_name = self.select_policy()
 
         print('POLICY NAME: ', self.policy_name)
+        self.parallel_train_env = parallel_train_env
         self.train_env = train_env
-        self.test_env = test_env
         self.eval_env = eval_env
         self.models = self.create_models(num_models=self.model_config['num_models'])
 
