@@ -29,27 +29,30 @@ def get_mutual_information(x, y, normalize=True):
     else:
         return drv.information_mutual(x, y, cartesian_product=True)
 
-# https://github.com/google-research/disentanglement_lib/blob/master/disentanglement_lib/evaluation/metrics/mig.py
-''' 
+# [ch] https://github.com/google-research/disentanglement_lib/blob/master/disentanglement_lib/evaluation/metrics/mig.py
+# [ch] does not pass tests: https://github.com/google-research/disentanglement_lib/blob/master/disentanglement_lib/evaluation/metrics/utils_test.py 
+'''
 def discrete_entropy(y):
-    num_factors = y.shape[1]
+    num_factors = y.shape[0]
     h = np.zeros(num_factors)
     for j in range(num_factors):
-        h[j] = get_mutual_information(y[:, j], y[:, j])
+        h[j] = get_mutual_information(y[j,:], y[j,:])
     return h
 '''
 
+# [ch] pass tests: https://github.com/google-research/disentanglement_lib/blob/master/disentanglement_lib/evaluation/metrics/utils_test.py 
 def discrete_entropy(ys):
     num_factors = ys.shape[1]
     h = np.zeros(num_factors)
     
     for j in range(num_factors):
         # Calculate entropy using the probabilities of each class
-        prob_distribution = np.bincount(ys[:, j]) / ys.shape[0]  # Probability of each class
+        prob_distribution = np.bincount(ys[:,j]) / ys.shape[0]  # Probability of each class
         prob_distribution = prob_distribution[prob_distribution > 0]  # Remove zero probabilities
         h[j] = -np.sum(prob_distribution * np.log(prob_distribution))  # Entropy formula
         
     return h
+
     
 # [ch] Usage:
 # [ch]      1. **factors, codes, just pass to the function as their raw form, set continuous_factors=True.**
@@ -107,4 +110,6 @@ if __name__ == "__main__":
     
     factors = np.random.randint(0, 10,size=(1000, 4))
     codes =  factors+1
+    target = np.transpose(np.array([[1, 1, 2, 2, 3, 3], [3, 3, 2, 2, 1, 1]]))
+    print(discrete_entropy(target))
     print(mig(factors,codes))
