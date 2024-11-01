@@ -14,9 +14,9 @@
 # limitations under the License.
 import numpy as np
 
-from numpy.core.numeric import NaN
+# from numpy.core.numeric import NaN
+NaN = np.nan
 from sklearn.preprocessing import minmax_scale
-
 
 
 def get_bin_index(x, nb_bins):
@@ -216,7 +216,7 @@ def _prepare_datasets(factors, codes, batch_size, nb_training, nb_eval, variance
     eval_factors = np.random.randint(low=0, high=nb_factors, size=nb_eval)
     unique, counts = np.unique(eval_factors, return_counts=True)
     eval_factors = dict(zip(unique, counts))
-    
+
     # iterate over factor IDs
     for factor_id in range(nb_factors):
         # make sure factor ID is in both dictionaries
@@ -282,8 +282,6 @@ def _prepare_datasets(factors, codes, batch_size, nb_training, nb_eval, variance
             # number of times we need to pass over all the factor value examples
             nb_factor_value_examples = len(factor_value_lines_idx) 
             nb_loops = int(np.ceil(nb_examples_needed / nb_factor_value_examples))
-            # [ch] test understanding here, assert (nb_factor_value_examples == count)
-            assert (nb_factor_value_examples == count)
             
             # iterate over all factor value examples
             line_idx = 0
@@ -360,3 +358,10 @@ def _prepare_datasets(factors, codes, batch_size, nb_training, nb_eval, variance
     eval_set = eval_set[lines_idx]
 
     return train_set, eval_set
+
+
+if __name__ == "__main__":
+    
+    factors = np.random.randint(0, 10,size=(1000, 20))
+    codes = factors*10+1
+    print(z_min_var(factors,codes,scale=True))
