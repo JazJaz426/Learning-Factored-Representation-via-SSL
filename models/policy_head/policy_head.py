@@ -326,6 +326,7 @@ class PolicyHead:
             gif_callback = GifLoggingCallback(env = self.train_env, save_freq = self.model_config['gif_log_freq'], log_dir = f"./logs/{self.algorithm}_{self.data_config['environment_name']}_policyviz/{self.data_config['observation_space']}/seed_{seed}/", name_prefix = 'policy_gif')
             checkpoint_callback = CheckpointCallback(save_freq=self.model_config['save_weight_freq'], save_path=f"./logs/{self.algorithm}_{self.data_config['environment_name']}_weights/{self.data_config['observation_space']}/seed_{seed}/", name_prefix=f'{self.algorithm}_seed{seed}_step', save_replay_buffer=True)
 
+
             # Create the callback list
             callback = CallbackList([reward_callback, eval_reward_callback, gif_callback, checkpoint_callback])
 
@@ -368,46 +369,3 @@ if __name__ == '__main__':
         'configs/data_generator/config.yaml'
     )
     policy_head.train_and_evaluate_policy(total_timestamps=1000000)
-
-
-
-def train_and_evaluate_policy_old(self, total_timestamps):
-    train_interval = self.model_config['train_interval']
-    eval_interval = self.model_config['eval_interval']
-    iteration = 0
-
-    while iteration * (train_interval + eval_interval) < total_timestamps:
-        train_rewards = []
-        eval_rewards = []
-
-        for seed, model in self.models.items():
-
-            #NOTE: potentially uncomment if needed
-
-            reward_callback = RewardValueCallback(env = self.train_env, save_freq = self.model_config['reward_log_freq'], log_dir=f"./logs/{self.algorithm}_tensorboard/{self.data_config['observation_space']}/seed_{seed}/")
-            gif_callback = GifLoggingCallback(env = self.train_env, save_freq = self.model_config['gif_log_freq'], log_dir = f"./logs/{self.algorithm}_policyviz/{self.data_config['observation_space']}/seed_{seed}/", name_prefix = 'policy_gif')
-            # model.learn(total_timesteps=train_interval, callback=callback)
-            # Create the callback list
-            callback = CallbackList([reward_callback, gif_callback])
-            #progress_bar=True
-            model.learn(total_timesteps=train_interval, tb_log_name=f'{self.algorithm}_{seed}', progress_bar = True, reset_num_timesteps=False, callback = callback)
-            #TODO: model.save with save dir
-
-            train_reward = self.evaluate_policy(self.train_env, seed, train_interval)
-            train_rewards.append(train_reward)
-
-            if (iteration + 1) * (train_interval + eval_interval) <= total_timestamps:
-                eval_reward = self.evaluate_policy(self.eval_env, seed, eval_interval)
-                eval_rewards.append(eval_reward)
-
-        avg_train_reward = np.mean(train_rewards)
-        std_train_reward = np.std(train_rewards)
-        avg_eval_reward = np.mean(eval_rewards)
-        std_eval_reward = np.std(eval_rewards)
-
-        print(f"Iteration {iteration}:")
-        print(f"  Train - Avg Reward: {avg_train_reward}, Std Reward: {std_train_reward}")
-        print(f"  Eval  - Avg Reward: {avg_eval_reward}, Std Reward: {std_eval_reward}")
-
-        iteration += 1
-
