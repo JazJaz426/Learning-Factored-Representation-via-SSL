@@ -18,17 +18,19 @@ import re
 import pandas as pd
 
 class RewardValueCallback(BaseCallback):
-    def __init__(self, env: gym.Env, save_freq: int, log_dir: str, csv_log_dir: str, verbose=0, max_steps: int = 200, train=True):
+    def __init__(self, env: gym.Env, save_freq: int, log_dir: str, csv_log_dir: str, verbose=0, train=True):
         super(RewardValueCallback, self).__init__(verbose)
         self.log_dir = log_dir
         self.writer = SummaryWriter(log_dir)
-        self.max_steps = max_steps
+        self.max_steps = env.env.max_steps
         self.env = env
         self.save_freq = save_freq
         self.train = train
 
-        self.csv_log_dir = os.path.join(log_dir, 'episodic_reward_logs.csv')
+        self.csv_log_dir = os.path.join(csv_log_dir, 'episodic_reward_logs.csv')
         self.csv_logger = pd.DataFrame(columns=['train/test', 'step', 'seed', 'cumul_reward'])
+
+        os.makedirs(csv_log_dir, exist_ok=True)
 
         os.makedirs(self.log_dir, exist_ok=True)
 
@@ -58,21 +60,26 @@ class RewardValueCallback(BaseCallback):
                 obs, rewards, dones, __, infos = self.env.step(actions)
 
                 # Log the value function and reward to TensorBoard
-
                 cumulative_reward += rewards
                 self.writer.add_scalar(f"{'train' if self.train else 'test'} reward per step", rewards, self.num_timesteps + step)
-                # self.writer.add_scalar("value per step", value, self.num_timesteps + step)
-
                 step += 1
+
+                #if goal is achieved then do not continue iterations
+                if dones:
+                    break
+
+            
+            #NOTE: error check -- ensuring cumulative reward isn't > 1 or < 0
+            assert (cumulative_reward <= 1.0 and cumulative_reward >= 0.0), f'ERROR: cumulative reward is {cumulative_reward}'
 
             # Log the cumulative reward
             self.writer.add_scalar(f"{'train' if self.train else 'test'} cumul reward", cumulative_reward, self.num_timesteps)
-            self.writer.add_scalar(f"{'train' if self.train else 'test'} avg reward", cumulative_reward/step, self.num_timesteps)
+            # self.writer.add_scalar(f"{'train' if self.train else 'test'} avg reward", cumulative_reward/step, self.num_timesteps)
 
             # Print the logged rewards
             print("=-------------------------=")
             print(f"{'train' if self.train else 'test'} cumul reward @ {self.num_timesteps}: ", cumulative_reward)
-            print(f"{'train' if self.train else 'test'} avg reward @ {self.num_timesteps}: ", cumulative_reward/step)
+            # print(f"{'train' if self.train else 'test'} avg reward @ {self.num_timesteps}: ", cumulative_reward/step)
 
             #log the cumulative rewards to csv file
             self.csv_logger[len(self.csv_logger)] = {'train/test': 'train' if self.train else 'test', 'step': self.num_timesteps, 'seed': self.model.seed, 'cumul_reward': cumulative_reward}
@@ -98,10 +105,6 @@ class GifLoggingCallback(BaseCallback):
         if self.n_calls % self.save_freq == 0:
             self._create_gif()
             self._create_value_func()
-
-            #TODO: Yichen please help to implement value function logging
-            # - may need different ways to get value for DQN vs PPO vs A2C
-            # self._create_value_func()
             
         return True
     
@@ -128,7 +131,7 @@ class GifLoggingCallback(BaseCallback):
                     for dir in range(4):
                         
                         self.env.env.unwrapped.agent_dir = dir
-                        obs = self.env.env.get_frame(tile_size=8)
+                        obs = self.env.env.unwrapped.get_frame(tile_size=8)
 
                        
                         
@@ -143,9 +146,9 @@ class GifLoggingCallback(BaseCallback):
 
                     value_function[w, h] = np.mean(value_estim)
         
-
+        pdb.set_trace()
         #normalize the value function so it is 0-1
-        value_function = value_function / np.sum(value_function)
+        value_function = value_function / np.nansum(value_function)
 
         #plotting value function over the observation
         fig = plt.figure(frameon=False)
@@ -318,17 +321,16 @@ class PolicyHead:
             # model.set_logger(new_logger)
 
 
-            reward_callback = RewardValueCallback(env = self.train_env, save_freq = self.model_config['reward_log_freq'], log_dir=f"./{self.algorithm}_{self.data_config['environment_name']}_tensorboard/{self.data_config['observation_space']}/seed_{seed}/", train=True)
-            eval_reward_callback = RewardValueCallback(env = self.eval_env, save_freq = self.model_config['reward_log_freq'], log_dir=f"./{self.algorithm}_{self.data_config['environment_name']}_tensorboard/{self.data_config['observation_space']}/seed_{seed}/", train=False)
-            gif_callback = GifLoggingCallback(env = self.train_env, save_freq = self.model_config['gif_log_freq'], log_dir = f"./{self.algorithm}_{self.data_config['environment_name']}_policyviz/{self.data_config['observation_space']}/seed_{seed}/", name_prefix = 'policy_gif')
-            checkpoint_callback = CheckpointCallback(save_freq=self.model_config['save_weight_freq'], save_path=f"./{self.algorithm}_{self.data_config['environment_name']}_weights/{self.data_config['observation_space']}/seed_{seed}/", name_prefix=f'{self.algorithm}_seed{seed}_step', save_replay_buffer=True)
+            reward_callback = RewardValueCallback(env = self.train_env, save_freq = self.model_config['reward_log_freq'], log_dir=f"./logs/{self.algorithm}_{self.data_config['environment_name']}_tensorboard/{self.data_config['observation_space']}/seed_{seed}/", csv_log_dir=f"./logs/{self.algorithm}_{self.data_config['environment_name']}_rewards/{self.data_config['observation_space']}/seed_{seed}/", train=True)
+            eval_reward_callback = RewardValueCallback(env = self.eval_env, save_freq = self.model_config['reward_log_freq'], log_dir=f"./logs/{self.algorithm}_{self.data_config['environment_name']}_tensorboard/{self.data_config['observation_space']}/seed_{seed}/", csv_log_dir=f"./logs/{self.algorithm}_{self.data_config['environment_name']}_rewards/{self.data_config['observation_space']}/seed_{seed}/", train=False)
+            gif_callback = GifLoggingCallback(env = self.train_env, save_freq = self.model_config['gif_log_freq'], log_dir = f"./logs/{self.algorithm}_{self.data_config['environment_name']}_policyviz/{self.data_config['observation_space']}/seed_{seed}/", name_prefix = 'policy_gif')
+            checkpoint_callback = CheckpointCallback(save_freq=self.model_config['save_weight_freq'], save_path=f"./logs/{self.algorithm}_{self.data_config['environment_name']}_weights/{self.data_config['observation_space']}/seed_{seed}/", name_prefix=f'{self.algorithm}_seed{seed}_step', save_replay_buffer=True)
+
 
             # Create the callback list
             callback = CallbackList([reward_callback, eval_reward_callback, gif_callback, checkpoint_callback])
 
             model.learn(total_timesteps=train_interval, tb_log_name=f'{self.algorithm}_{seed}', progress_bar = True, reset_num_timesteps=False, callback = callback)
-            # model.save(path=f"./{self.algorithm}_weights/seed_{seed}/{self.algortihm}_seed{seed}_step{self.model.num_timesteps}")
-
 
 
 
