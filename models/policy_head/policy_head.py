@@ -17,8 +17,10 @@ from matplotlib import pyplot as plt
 import re
 import pandas as pd
 
+csv_logger = pd.DataFrame(columns=['train/test', 'step', 'seed', 'cumul_reward'])
+
 class RewardValueCallback(BaseCallback):
-    def __init__(self, env: gym.Env, save_freq: int, log_dir: str, csv_log_dir: str, verbose=0, train=True):
+    def __init__(self, env: gym.Env, save_freq: int, log_dir: str, csv_log_dir: str, num_envs:int, verbose=0, train=True):
         super(RewardValueCallback, self).__init__(verbose)
         self.log_dir = log_dir
         self.writer = SummaryWriter(log_dir)
@@ -27,19 +29,23 @@ class RewardValueCallback(BaseCallback):
         self.save_freq = save_freq
         self.train = train
 
+        self.num_envs = num_envs
+
         self.csv_log_dir = os.path.join(csv_log_dir, 'episodic_reward_logs.csv')
-        self.csv_logger = pd.DataFrame(columns=['train/test', 'step', 'seed', 'cumul_reward'])
+
 
         os.makedirs(csv_log_dir, exist_ok=True)
 
         os.makedirs(self.log_dir, exist_ok=True)
 
     def _on_step(self) -> bool:
+
         # Save a GIF every save_freq steps
-        
-        if self.n_calls % self.save_freq == 0:
+        if self.n_calls % (self.save_freq//self.num_envs) == 0:
             self._log_rewards_and_value()
-            self.csv_logger.to_csv(self.csv_log_dir, index=False)
+
+            global csv_logger
+            csv_logger.to_csv(self.csv_log_dir, index=False)
             
 
         return True
@@ -48,13 +54,13 @@ class RewardValueCallback(BaseCallback):
     def _log_rewards_and_value(self):
         # Reset the environment
         obs, info = self.env.reset()
-        done = False
+        dones = False
         step = 0
         cumulative_reward = 0
 
         with torch.no_grad():
 
-            while not done and step < self.max_steps:
+            while not dones and step < self.max_steps:
                 # Predict action and get value function (self.model.predict returns the action and value)
                 actions, _states = self.model.predict(obs, deterministic=True)
                 obs, rewards, dones, __, infos = self.env.step(actions)
@@ -63,10 +69,6 @@ class RewardValueCallback(BaseCallback):
                 cumulative_reward += rewards
                 self.writer.add_scalar(f"{'train' if self.train else 'test'} reward per step", rewards, self.num_timesteps + step)
                 step += 1
-
-                #if goal is achieved then do not continue iterations
-                if dones:
-                    break
 
             
             #NOTE: error check -- ensuring cumulative reward isn't > 1 or < 0
@@ -82,27 +84,30 @@ class RewardValueCallback(BaseCallback):
             # print(f"{'train' if self.train else 'test'} avg reward @ {self.num_timesteps}: ", cumulative_reward/step)
 
             #log the cumulative rewards to csv file
-            self.csv_logger[len(self.csv_logger)] = {'train/test': 'train' if self.train else 'test', 'step': self.num_timesteps, 'seed': self.model.seed, 'cumul_reward': cumulative_reward}
+            global csv_logger
+            csv_logger = pd.concat([pd.DataFrame([{'train/test': 'train' if self.train else 'test', 'step': self.num_timesteps, 'seed': self.model.seed, 'cumul_reward': cumulative_reward}]), csv_logger], ignore_index=True)
         
     
     def _on_training_end(self):
         self.writer.close()
 
 class GifLoggingCallback(BaseCallback):
-    def __init__(self, env: gym.Env, save_freq: int, log_dir: str, max_steps: int = 100, name_prefix: str = "", verbose=1):
+    def __init__(self, env: gym.Env, save_freq: int, log_dir: str, num_envs: int, name_prefix: str = "", verbose=1):
         super(GifLoggingCallback, self).__init__(verbose)
         self.env = env
         self.save_freq = save_freq
         self.log_dir = log_dir
-        self.max_steps = max_steps
+        self.max_steps = env.env.max_steps
         self.name_prefix = name_prefix
 
+        self.num_envs = num_envs
         os.makedirs(self.log_dir, exist_ok=True)
         # self.writer = SummaryWriter(log_dir)
 
     def _on_step(self) -> bool:
+        
         # Save a GIF every save_freq steps
-        if self.n_calls % self.save_freq == 0:
+        if self.n_calls % (self.save_freq//self.num_envs) == 0:
             self._create_gif()
             self._create_value_func()
             
@@ -146,7 +151,7 @@ class GifLoggingCallback(BaseCallback):
 
                     value_function[w, h] = np.mean(value_estim)
         
-        pdb.set_trace()
+        
         #normalize the value function so it is 0-1
         value_function = value_function / np.nansum(value_function)
 
@@ -158,6 +163,7 @@ class GifLoggingCallback(BaseCallback):
         plt.colorbar()
         plt.title(f"Value Function @ Step {self.num_timesteps}")
         plt.savefig(os.path.join(self.log_dir, f"{self.name_prefix}_value_step_{self.num_timesteps}.png"))
+        plt.close()
 
 
     def _create_gif(self):
@@ -165,7 +171,6 @@ class GifLoggingCallback(BaseCallback):
         obs, info = self.env.reset()
         done = False
         step = 0
-        # pdb.set_trace()
         
         while not done and step < self.max_steps:
             # Render the environment and save frame
@@ -183,7 +188,6 @@ class GifLoggingCallback(BaseCallback):
        
 
         gif_path = os.path.join(self.log_dir, f"{self.name_prefix}_policy_step_{self.num_timesteps}.gif")
-        # pdb.set_trace()
         imageio.mimsave(gif_path, [np.array(img) for img in images], fps=5)
 
         
@@ -198,16 +202,10 @@ class GifLoggingCallback(BaseCallback):
         self.writer.add_image(f"{self.name_prefix}_policy_step_{self.num_timesteps}", gif_bytes, self.num_timesteps, dataformats="HWC")
 
     def _on_training_end(self):
-        self.writer.close()
+        plt.close()
 
 class PolicyHead:
-    def __init__(self, 
-                 parallel_train_env, 
-                 train_env,
-                 eval_env, 
-                 model_config_path, 
-                 data_config_path
-        ):
+    def __init__(self, model_config_path, data_config_path):
         self.model_config = self.load_config(os.path.join(os.path.dirname(__file__), '../..', model_config_path))['policy_head']
         self.data_config = self.load_config(os.path.join(os.path.dirname(__file__), '../..', data_config_path))
         self.algorithm = self.model_config['algorithm']
@@ -215,14 +213,18 @@ class PolicyHead:
         self.policy_name = self.select_policy()
 
         print('POLICY NAME: ', self.policy_name)
-        self.parallel_train_env = parallel_train_env
-        self.train_env = train_env
-        self.eval_env = eval_env
-        self.models = self.create_models(num_models=self.model_config['num_models'])
+        self.parallel_train_envs = self.create_parallel_envs(num_seeds = self.model_config['num_seeds'])
+        self.train_env = self.gen_train_env()
+        self.eval_env = self.gen_test_env()
+        self.models = self.create_models(num_seeds=self.model_config['num_seeds'])
 
         #check that critical configs for test and train are equal 
         assert (self.train_env.observation_space == self.eval_env.observation_space), \
             f"ERROR: observaiton type {self.train_env.observation_space} and environment {self.eval_env.observation_space} need to be same for train and eval configs"
+
+        for k in self.parallel_train_envs.keys():
+            assert (self.parallel_train_envs[k].observation_space == self.eval_env.observation_space), \
+                f"ERROR: observaiton type {self.parallel_train_envs.observation_space} and environment {self.eval_env.observation_space} need to be same for train and eval configs"
 
     def linear_schedule(self, initial_value: float):
         """
@@ -254,10 +256,33 @@ class PolicyHead:
             return "MlpPolicy"
         else:
             raise ValueError(f"Unsupported data type: {self.data_type}")
+    
+    def create_parallel_envs(self, num_seeds:int=3):
 
-    def create_models(self, num_models: int = 3):
+        parallel_train_envs = {}
+
+        for seed in range(num_seeds):
+
+            parallel_train_envs[seed] = SubprocVecEnv([lambda: self.gen_train_env(seed) for i in range(self.model_config['num_parallel_envs'])])
+        
+        return parallel_train_envs
+        
+
+    def gen_train_env(self, seed = None):
+        env = DataGenerator('config.yaml')
+        env.reset(seed=seed)
+        return env
+    
+    def gen_test_env(self, seed = None):
+        env = DataGenerator('config_test.yaml')
+        env.reset(seed=seed)
+        return env
+
+    def create_models(self, num_seeds: int = 3):
         models = {}
-        for model_num in range(num_models):
+
+        
+        for model_num in range(num_seeds):
             if self.algorithm == "PPO":
                 ppo_params = {k: v for k, v in self.model_config['ppo'].items() if v is not None}
 
@@ -265,7 +290,7 @@ class PolicyHead:
                 #lr_schedule = self.linear_schedule(self.model_config['learning_rate'])                
                 models[model_num] = PPO(
                     policy=self.policy_name,
-                    env=self.train_env,
+                    env=self.parallel_train_envs[model_num],
                     seed=model_num,
                     **ppo_params,
                     tensorboard_log=f"./logs/{self.algorithm}_{self.data_config['environment_name']}_tensorboard/{self.data_config['observation_space']}/seed_{model_num}/"
@@ -274,7 +299,7 @@ class PolicyHead:
                 dqn_params = {k: v for k, v in self.model_config['dqn'].items() if v is not None}
                 models[model_num] = DQN(
                     policy=self.policy_name,
-                    env=self.train_env,
+                    env=self.parallel_train_envs[model_num],
                     seed=model_num,
                     **dqn_params,
                     tensorboard_log=f"./logs/{self.algorithm}_{self.data_config['environment_name']}_tensorboard/{self.data_config['observation_space']}/seed_{model_num}/"
@@ -283,7 +308,7 @@ class PolicyHead:
                 a2c_params = {k: v for k, v in self.model_config['a2c'].items() if v is not None}
                 models[model_num] = A2C(
                     policy=self.policy_name,
-                    env=self.train_env,
+                    env=self.parallel_train_envs[model_num],
                     seed=model_num,
                     **a2c_params,
                     tensorboard_log=f"./logs/{self.algorithm}_{self.data_config['environment_name']}_tensorboard/{self.data_config['observation_space']}/seed_{model_num}/"
@@ -293,13 +318,12 @@ class PolicyHead:
         return models
     
 
-    def train_and_evaluate_policy(self, total_timestamps):
+    def train_and_evaluate_policy(self):
 
         
         
         train_interval = self.model_config['train_interval']
-        # eval_interval = self.model_config['eval_interval']
-        iteration = 0
+
         for seed in self.models.keys():
 
             if os.path.exists(f"./logs/{self.algorithm}_{self.data_config['environment_name']}_weights/{self.data_config['observation_space']}/seed_{seed}") and len(os.listdir(f"./logs/{self.algorithm}_{self.data_config['environment_name']}_weights/{self.data_config['observation_space']}/seed_{seed}")) > 0:
@@ -309,63 +333,33 @@ class PolicyHead:
 
                 final_path = os.path.join(f"./logs/{self.algorithm}_{self.data_config['environment_name']}_weights/{self.data_config['observation_space']}/seed_{seed}", latest_weight.split('.')[0])
 
-                self.models[seed].load(path = final_path, env = self.train_env)
-
-            
+                self.models[seed].load(path = final_path, env = self.parallel_train_envs[seed])
 
             
         for seed, model in self.models.items():
 
-            #NOTE: potentially uncomment if needed
-            # new_logger = configure(f"./{self.algorithm}_tensorboard/model_{seed}", ["stdout", "tensorboard"])
-            # model.set_logger(new_logger)
-
-
-            reward_callback = RewardValueCallback(env = self.train_env, save_freq = self.model_config['reward_log_freq'], log_dir=f"./logs/{self.algorithm}_{self.data_config['environment_name']}_tensorboard/{self.data_config['observation_space']}/seed_{seed}/", csv_log_dir=f"./logs/{self.algorithm}_{self.data_config['environment_name']}_rewards/{self.data_config['observation_space']}/seed_{seed}/", train=True)
-            eval_reward_callback = RewardValueCallback(env = self.eval_env, save_freq = self.model_config['reward_log_freq'], log_dir=f"./logs/{self.algorithm}_{self.data_config['environment_name']}_tensorboard/{self.data_config['observation_space']}/seed_{seed}/", csv_log_dir=f"./logs/{self.algorithm}_{self.data_config['environment_name']}_rewards/{self.data_config['observation_space']}/seed_{seed}/", train=False)
-            gif_callback = GifLoggingCallback(env = self.train_env, save_freq = self.model_config['gif_log_freq'], log_dir = f"./logs/{self.algorithm}_{self.data_config['environment_name']}_policyviz/{self.data_config['observation_space']}/seed_{seed}/", name_prefix = 'policy_gif')
+            reward_callback = RewardValueCallback(env = self.train_env, save_freq = self.model_config['reward_log_freq'], log_dir=f"./logs/{self.algorithm}_{self.data_config['environment_name']}_tensorboard/{self.data_config['observation_space']}/seed_{seed}/", csv_log_dir=f"./logs/{self.algorithm}_{self.data_config['environment_name']}_rewards/{self.data_config['observation_space']}/seed_{seed}/", num_envs= self.model_config['num_parallel_envs'], train=True)
+            eval_reward_callback = RewardValueCallback(env = self.eval_env, save_freq = self.model_config['reward_log_freq'], log_dir=f"./logs/{self.algorithm}_{self.data_config['environment_name']}_tensorboard/{self.data_config['observation_space']}/seed_{seed}/", csv_log_dir=f"./logs/{self.algorithm}_{self.data_config['environment_name']}_rewards/{self.data_config['observation_space']}/seed_{seed}/", num_envs = self.model_config['num_parallel_envs'], train=False)
+            gif_callback = GifLoggingCallback(env = self.train_env, save_freq = self.model_config['gif_log_freq'], log_dir = f"./logs/{self.algorithm}_{self.data_config['environment_name']}_policyviz/{self.data_config['observation_space']}/seed_{seed}/", num_envs= self.model_config['num_parallel_envs'], name_prefix = 'policy_gif')
             checkpoint_callback = CheckpointCallback(save_freq=self.model_config['save_weight_freq'], save_path=f"./logs/{self.algorithm}_{self.data_config['environment_name']}_weights/{self.data_config['observation_space']}/seed_{seed}/", name_prefix=f'{self.algorithm}_seed{seed}_step', save_replay_buffer=True)
 
 
             # Create the callback list
             callback = CallbackList([reward_callback, eval_reward_callback, gif_callback, checkpoint_callback])
-
+            
+            
             model.learn(total_timesteps=train_interval, tb_log_name=f'{self.algorithm}_{seed}', progress_bar = True, reset_num_timesteps=False, callback = callback)
-
-
-
-    def evaluate_policy(self, env, seed, num_timestamps=10):
-        all_rewards = []
-        for _ in range(num_timestamps):
-            obs, info = env.reset()
-            episode_reward = 0
-            while True:
-                action, _states = self.models[seed].predict(obs, deterministic=True)
-                obs, reward, terminated, truncated, info = env.step(action)
-                episode_reward += reward
-                if terminated or truncated:
-                    break
-            all_rewards.append(episode_reward)
-        return np.mean(all_rewards)
     
-    # TODO Jazlyn
-    def tune_hyperparameter():
-        pass
 
 
-def gen_env(seed):
-    env = DataGenerator('config.yaml')
-    env.reset(seed=seed)
-    return env
+
 
 if __name__ == '__main__':
     print(DataGenerator('config.yaml').observation_space)
     print(DataGenerator('config_test.yaml').observation_space)
-    policy_head = PolicyHead(
-        SubprocVecEnv([lambda: gen_env(i) for i in range(4)]), 
-        DataGenerator('config.yaml'), 
-        DataGenerator('config_test.yaml'), 
+    policy_head = PolicyHead( 
         'configs/models/config.yaml', 
         'configs/data_generator/config.yaml'
     )
-    policy_head.train_and_evaluate_policy(total_timestamps=1000000)
+    policy_head.train_and_evaluate_policy()
+
