@@ -100,6 +100,8 @@ class GifLoggingCallback(BaseCallback):
         self.max_steps = env.env.max_steps
         self.name_prefix = name_prefix
 
+        
+
         self.num_envs = num_envs
         os.makedirs(self.log_dir, exist_ok=True)
         # self.writer = SummaryWriter(log_dir)
@@ -205,26 +207,29 @@ class GifLoggingCallback(BaseCallback):
         plt.close()
 
 class PolicyHead:
-    def __init__(self, model_config_path, data_config_path):
+    def __init__(self, model_config_path, data_config_path, seed=None):
         self.model_config = self.load_config(os.path.join(os.path.dirname(__file__), '../..', model_config_path))['policy_head']
         self.data_config = self.load_config(os.path.join(os.path.dirname(__file__), '../..', data_config_path))
         self.algorithm = self.model_config['algorithm']
         self.data_type = self.data_config['observation_space']
         self.policy_name = self.select_policy()
 
+        #set the seed in order to create argparsable separate runs for each seed
+        self.seed = self.model_config['seed']
+
         print('POLICY NAME: ', self.policy_name)
-        self.parallel_train_envs = self.create_parallel_envs(num_seeds = self.model_config['num_seeds'])
-        self.train_env = self.gen_train_env()
-        self.eval_env = self.gen_test_env()
-        self.models = self.create_models(num_seeds=self.model_config['num_seeds'])
+        self.parallel_train_env = self.create_parallel_envs(seed = self.seed)
+        self.train_env = self.gen_train_env(seed = self.seed)
+        self.eval_env = self.gen_test_env(seed = self.seed)
+        self.model = self.create_models(seed=self.seed)
 
         #check that critical configs for test and train are equal 
         assert (self.train_env.observation_space == self.eval_env.observation_space), \
             f"ERROR: observaiton type {self.train_env.observation_space} and environment {self.eval_env.observation_space} need to be same for train and eval configs"
 
-        for k in self.parallel_train_envs.keys():
-            assert (self.parallel_train_envs[k].observation_space == self.eval_env.observation_space), \
-                f"ERROR: observaiton type {self.parallel_train_envs.observation_space} and environment {self.eval_env.observation_space} need to be same for train and eval configs"
+       
+        assert (self.parallel_train_env.observation_space == self.eval_env.observation_space), \
+            f"ERROR: observaiton type {self.parallel_train_env.observation_space} and environment {self.eval_env.observation_space} need to be same for train and eval configs"
 
     def linear_schedule(self, initial_value: float):
         """
@@ -257,15 +262,9 @@ class PolicyHead:
         else:
             raise ValueError(f"Unsupported data type: {self.data_type}")
     
-    def create_parallel_envs(self, num_seeds:int=3):
-
-        parallel_train_envs = {}
-
-        for seed in range(num_seeds):
-
-            parallel_train_envs[seed] = SubprocVecEnv([lambda: self.gen_train_env(seed) for i in range(self.model_config['num_parallel_envs'])])
+    def create_parallel_envs(self, seed:int=0):
         
-        return parallel_train_envs
+        return SubprocVecEnv([lambda: self.gen_train_env(seed) for i in range(self.model_config['num_parallel_envs'])])
         
 
     def gen_train_env(self, seed = None):
@@ -278,44 +277,43 @@ class PolicyHead:
         env.reset(seed=seed)
         return env
 
-    def create_models(self, num_seeds: int = 3):
-        models = {}
+    def create_models(self, seed: int = 0):
 
         
-        for model_num in range(num_seeds):
-            if self.algorithm == "PPO":
-                ppo_params = {k: v for k, v in self.model_config['ppo'].items() if v is not None}
+        
+        if self.algorithm == "PPO":
+            ppo_params = {k: v for k, v in self.model_config['ppo'].items() if v is not None}
 
-                #NOTE: include lr schedule if needed
-                #lr_schedule = self.linear_schedule(self.model_config['learning_rate'])                
-                models[model_num] = PPO(
-                    policy=self.policy_name,
-                    env=self.parallel_train_envs[model_num],
-                    seed=model_num,
-                    **ppo_params,
-                    tensorboard_log=f"./logs/{self.algorithm}_{self.data_config['environment_name']}_tensorboard/{self.data_config['observation_space']}/seed_{model_num}/"
-                )
-            elif self.algorithm == "DQN":
-                dqn_params = {k: v for k, v in self.model_config['dqn'].items() if v is not None}
-                models[model_num] = DQN(
-                    policy=self.policy_name,
-                    env=self.parallel_train_envs[model_num],
-                    seed=model_num,
-                    **dqn_params,
-                    tensorboard_log=f"./logs/{self.algorithm}_{self.data_config['environment_name']}_tensorboard/{self.data_config['observation_space']}/seed_{model_num}/"
-                )
-            elif self.algorithm == "A2C":
-                a2c_params = {k: v for k, v in self.model_config['a2c'].items() if v is not None}
-                models[model_num] = A2C(
-                    policy=self.policy_name,
-                    env=self.parallel_train_envs[model_num],
-                    seed=model_num,
-                    **a2c_params,
-                    tensorboard_log=f"./logs/{self.algorithm}_{self.data_config['environment_name']}_tensorboard/{self.data_config['observation_space']}/seed_{model_num}/"
-                )
-            else:
-                raise ValueError(f"Unsupported RL algorithm: {self.algorithm}")
-        return models
+            #NOTE: include lr schedule if needed
+            #lr_schedule = self.linear_schedule(self.model_config['learning_rate'])                
+            model = PPO(
+                policy=self.policy_name,
+                env=self.parallel_train_env,
+                seed=seed,
+                **ppo_params,
+                tensorboard_log=f"./logs/{self.algorithm}_{self.data_config['environment_name']}_tensorboard/{self.data_config['observation_space']}/seed_{seed}/"
+            )
+        elif self.algorithm == "DQN":
+            dqn_params = {k: v for k, v in self.model_config['dqn'].items() if v is not None}
+            model = DQN(
+                policy=self.policy_name,
+                env=self.parallel_train_env,
+                seed=seed,
+                **dqn_params,
+                tensorboard_log=f"./logs/{self.algorithm}_{self.data_config['environment_name']}_tensorboard/{self.data_config['observation_space']}/seed_{seed}/"
+            )
+        elif self.algorithm == "A2C":
+            a2c_params = {k: v for k, v in self.model_config['a2c'].items() if v is not None}
+            model = A2C(
+                policy=self.policy_name,
+                env=self.parallel_train_env,
+                seed=seed,
+                **a2c_params,
+                tensorboard_log=f"./logs/{self.algorithm}_{self.data_config['environment_name']}_tensorboard/{self.data_config['observation_space']}/seed_{seed}/"
+            )
+        else:
+            raise ValueError(f"Unsupported RL algorithm: {self.algorithm}")
+        return model
     
 
     def train_and_evaluate_policy(self):
@@ -324,31 +322,31 @@ class PolicyHead:
         
         train_interval = self.model_config['train_interval']
 
-        for seed in self.models.keys():
+        
 
-            if os.path.exists(f"./logs/{self.algorithm}_{self.data_config['environment_name']}_weights/{self.data_config['observation_space']}/seed_{seed}") and len(os.listdir(f"./logs/{self.algorithm}_{self.data_config['environment_name']}_weights/{self.data_config['observation_space']}/seed_{seed}")) > 0:
-                latest_weight = list(sorted(os.listdir(f"./logs/{self.algorithm}_{self.data_config['environment_name']}_weights/{self.data_config['observation_space']}/seed_{seed}")))
-                
-                latest_weight = max(latest_weight, key=lambda f: int(re.search(r'\d+', f.split('step_')[1]).group()))
+        if os.path.exists(f"./logs/{self.algorithm}_{self.data_config['environment_name']}_weights/{self.data_config['observation_space']}/seed_{self.seed}") and len(os.listdir(f"./logs/{self.algorithm}_{self.data_config['environment_name']}_weights/{self.data_config['observation_space']}/seed_{self.seed}")) > 0:
+            latest_weight = list(sorted(os.listdir(f"./logs/{self.algorithm}_{self.data_config['environment_name']}_weights/{self.data_config['observation_space']}/seed_{self.seed}")))
+            
+            latest_weight = max(latest_weight, key=lambda f: int(re.search(r'\d+', f.split('step_')[1]).group()))
 
-                final_path = os.path.join(f"./logs/{self.algorithm}_{self.data_config['environment_name']}_weights/{self.data_config['observation_space']}/seed_{seed}", latest_weight.split('.')[0])
+            final_path = os.path.join(f"./logs/{self.algorithm}_{self.data_config['environment_name']}_weights/{self.data_config['observation_space']}/seed_{self.seed}", latest_weight.split('.')[0])
 
-                self.models[seed].load(path = final_path, env = self.parallel_train_envs[seed])
+            self.model.load(path = final_path, env = self.parallel_train_env)
 
             
-        for seed, model in self.models.items():
+        
 
-            reward_callback = RewardValueCallback(env = self.train_env, save_freq = self.model_config['reward_log_freq'], log_dir=f"./logs/{self.algorithm}_{self.data_config['environment_name']}_tensorboard/{self.data_config['observation_space']}/seed_{seed}/", csv_log_dir=f"./logs/{self.algorithm}_{self.data_config['environment_name']}_rewards/{self.data_config['observation_space']}/seed_{seed}/", num_envs= self.model_config['num_parallel_envs'], train=True)
-            eval_reward_callback = RewardValueCallback(env = self.eval_env, save_freq = self.model_config['reward_log_freq'], log_dir=f"./logs/{self.algorithm}_{self.data_config['environment_name']}_tensorboard/{self.data_config['observation_space']}/seed_{seed}/", csv_log_dir=f"./logs/{self.algorithm}_{self.data_config['environment_name']}_rewards/{self.data_config['observation_space']}/seed_{seed}/", num_envs = self.model_config['num_parallel_envs'], train=False)
-            gif_callback = GifLoggingCallback(env = self.train_env, save_freq = self.model_config['gif_log_freq'], log_dir = f"./logs/{self.algorithm}_{self.data_config['environment_name']}_policyviz/{self.data_config['observation_space']}/seed_{seed}/", num_envs= self.model_config['num_parallel_envs'], name_prefix = 'policy_gif')
-            checkpoint_callback = CheckpointCallback(save_freq=self.model_config['save_weight_freq'], save_path=f"./logs/{self.algorithm}_{self.data_config['environment_name']}_weights/{self.data_config['observation_space']}/seed_{seed}/", name_prefix=f'{self.algorithm}_seed{seed}_step', save_replay_buffer=True)
+        reward_callback = RewardValueCallback(env = self.train_env, save_freq = self.model_config['reward_log_freq'], log_dir=f"./logs/{self.algorithm}_{self.data_config['environment_name']}_tensorboard/{self.data_config['observation_space']}/seed_{self.seed}/", csv_log_dir=f"./logs/{self.algorithm}_{self.data_config['environment_name']}_rewards/{self.data_config['observation_space']}/seed_{self.seed}/", num_envs= self.model_config['num_parallel_envs'], train=True)
+        eval_reward_callback = RewardValueCallback(env = self.eval_env, save_freq = self.model_config['reward_log_freq'], log_dir=f"./logs/{self.algorithm}_{self.data_config['environment_name']}_tensorboard/{self.data_config['observation_space']}/seed_{self.seed}/", csv_log_dir=f"./logs/{self.algorithm}_{self.data_config['environment_name']}_rewards/{self.data_config['observation_space']}/seed_{self.seed}/", num_envs = self.model_config['num_parallel_envs'], train=False)
+        gif_callback = GifLoggingCallback(env = self.train_env, save_freq = self.model_config['gif_log_freq'], log_dir = f"./logs/{self.algorithm}_{self.data_config['environment_name']}_policyviz/{self.data_config['observation_space']}/seed_{self.seed}/", num_envs= self.model_config['num_parallel_envs'], name_prefix = 'policy_gif')
+        checkpoint_callback = CheckpointCallback(save_freq=self.model_config['save_weight_freq'], save_path=f"./logs/{self.algorithm}_{self.data_config['environment_name']}_weights/{self.data_config['observation_space']}/seed_{self.seed}/", name_prefix=f'{self.algorithm}_seed{self.seed}_step', save_replay_buffer=True)
 
 
-            # Create the callback list
-            callback = CallbackList([reward_callback, eval_reward_callback, gif_callback, checkpoint_callback])
-            
-            
-            model.learn(total_timesteps=train_interval, tb_log_name=f'{self.algorithm}_{seed}', progress_bar = True, reset_num_timesteps=False, callback = callback)
+        # Create the callback list
+        callback = CallbackList([reward_callback, eval_reward_callback, gif_callback, checkpoint_callback])
+        
+        
+        self.model.learn(total_timesteps=train_interval, tb_log_name=f'{self.algorithm}_{self.seed}', progress_bar = True, reset_num_timesteps=False, callback = callback)
     
 
 
