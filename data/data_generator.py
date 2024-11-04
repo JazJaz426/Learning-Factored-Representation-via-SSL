@@ -181,6 +181,8 @@ class DataGenerator(gym.Env):
         info['obs'] = frame
         #store original reward in case needed
         info['original_reward'] = reward
+        
+        info['is_success'] = reward > 0 and terminated
 
         #NOTE: newly added, modify reward to be step-penalty function
         #reward = 1 - ((abs(state['agent_pos'][0]-state['goal_pos'][0])+abs(state['agent_pos'][1]-state['goal_pos'][1]))/(self.env.unwrapped.height + self.env.unwrapped.width))

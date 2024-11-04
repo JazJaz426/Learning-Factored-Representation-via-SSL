@@ -1,6 +1,6 @@
 import yaml
 from stable_baselines3 import PPO, DQN, A2C
-from stable_baselines3.common.logger import configure
+from stable_baselines3.common.monitor import Monitor
 from stable_baselines3.common.vec_env import SubprocVecEnv
 import numpy as np
 import sys
@@ -215,7 +215,7 @@ class GifLoggingCallback(BaseCallback):
         plt.close()
 
 def gen_env(seed = None, config='config.yaml'):
-    env = DataGenerator(config)
+    env = Monitor(DataGenerator(config))
     env.reset(seed=seed)
     return env
 
@@ -332,8 +332,13 @@ class PolicyHead:
             project='ssl_rl',
             entity='waymao', 
             name=f'{self.algorithm}_{self.data_config["environment_name"]}_{self.data_config["observation_space"]}_seed_{self.seed}',
+            group=f'{self.algorithm}_{self.data_config["environment_name"]}_{self.data_config["observation_space"]}',
             sync_tensorboard=True,
-            monitor_gym=True
+            monitor_gym=True,
+            config={
+                "model": self.model_config,
+                "data": self.data_config,
+            }
         )
         train_interval = self.model_config['train_interval']
 
