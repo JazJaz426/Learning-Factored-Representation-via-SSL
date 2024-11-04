@@ -2,9 +2,10 @@ policy_head:
   algorithm: "PPO"  # Options: DQN, PPO, A2C
   num_models: 3
   train_interval: 1000000
-  # eval_interval: 1
+  num_eval_eps: 10
   verbose: true
-  gif_log_freq: 20000
+  video_length: 200
+  video_log_freq: 20000
   reward_log_freq: 2000
   save_weight_freq: 20000
 
