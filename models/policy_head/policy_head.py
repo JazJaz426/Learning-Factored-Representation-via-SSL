@@ -9,6 +9,7 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../..')
 from data.data_generator import DataGenerator
 import pdb
 from stable_baselines3.common.callbacks import BaseCallback, CallbackList, CheckpointCallback
+from stable_baselines3.common.vec_env import VecVideoRecorder
 import imageio
 from torch.utils.tensorboard import SummaryWriter
 import gymnasium as gym
@@ -16,8 +17,13 @@ import torch
 from matplotlib import pyplot as plt
 import re
 import pandas as pd
+import wandb
+
+import argparse
 
 csv_logger = pd.DataFrame(columns=['train/test', 'step', 'seed', 'cumul_reward'])
+
+from eval_callback import CustomEvalCallback
 
 class RewardValueCallback(BaseCallback):
     def __init__(self, env: gym.Env, save_freq: int, log_dir: str, csv_log_dir: str, num_envs:int, verbose=0, train=True):
@@ -58,34 +64,37 @@ class RewardValueCallback(BaseCallback):
         step = 0
         cumulative_reward = 0
 
-        with torch.no_grad():
+        while not dones.all() and step < self.max_steps:
+            # Predict action and get value function (self.model.predict returns the action and value)
+            actions, _states = self.model.predict(obs, deterministic=True)
+            obs, rewards, dones, __, infos = self.env.step(actions)
 
-            while not dones and step < self.max_steps:
-                # Predict action and get value function (self.model.predict returns the action and value)
-                actions, _states = self.model.predict(obs, deterministic=True)
-                obs, rewards, dones, __, infos = self.env.step(actions)
+        while not dones and step < self.max_steps:
+            # Predict action and get value function (self.model.predict returns the action and value)
+            actions, _states = self.model.predict(obs, deterministic=True)
+            obs, rewards, dones, __, infos = self.env.step(actions)
 
-                # Log the value function and reward to TensorBoard
-                cumulative_reward += rewards
-                self.writer.add_scalar(f"{'train' if self.train else 'test'} reward per step", rewards, self.num_timesteps + step)
-                step += 1
+            # Log the value function and reward to TensorBoard
+            cumulative_reward += rewards
+            self.writer.add_scalar(f"{'train' if self.train else 'test'} reward per step", rewards, self.num_timesteps + step)
+            step += 1
 
-            
-            #NOTE: error check -- ensuring cumulative reward isn't > 1 or < 0
-            assert (cumulative_reward <= 1.0 and cumulative_reward >= 0.0), f'ERROR: cumulative reward is {cumulative_reward}'
+        
+        #NOTE: error check -- ensuring cumulative reward isn't > 1 or < 0
+        assert (cumulative_reward <= 1.0 and cumulative_reward >= 0.0), f'ERROR: cumulative reward is {cumulative_reward}'
 
-            # Log the cumulative reward
-            self.writer.add_scalar(f"{'train' if self.train else 'test'} cumul reward", cumulative_reward, self.num_timesteps)
-            # self.writer.add_scalar(f"{'train' if self.train else 'test'} avg reward", cumulative_reward/step, self.num_timesteps)
+        # Log the cumulative reward
+        self.writer.add_scalar(f"{'train' if self.train else 'test'} cumul reward", cumulative_reward, self.num_timesteps)
+        # self.writer.add_scalar(f"{'train' if self.train else 'test'} avg reward", cumulative_reward/step, self.num_timesteps)
 
-            # Print the logged rewards
-            print("=-------------------------=")
-            print(f"{'train' if self.train else 'test'} cumul reward @ {self.num_timesteps}: ", cumulative_reward)
-            # print(f"{'train' if self.train else 'test'} avg reward @ {self.num_timesteps}: ", cumulative_reward/step)
+        # Print the logged rewards
+        print("=-------------------------=")
+        print(f"{'train' if self.train else 'test'} cumul reward @ {self.num_timesteps}: ", cumulative_reward)
+        # print(f"{'train' if self.train else 'test'} avg reward @ {self.num_timesteps}: ", cumulative_reward/step)
 
-            #log the cumulative rewards to csv file
-            global csv_logger
-            csv_logger = pd.concat([pd.DataFrame([{'train/test': 'train' if self.train else 'test', 'step': self.num_timesteps, 'seed': self.model.seed, 'cumul_reward': cumulative_reward}]), csv_logger], ignore_index=True)
+        #log the cumulative rewards to csv file
+        global csv_logger
+        csv_logger = pd.concat([pd.DataFrame([{'train/test': 'train' if self.train else 'test', 'step': self.num_timesteps, 'seed': self.model.seed, 'cumul_reward': cumulative_reward}]), csv_logger], ignore_index=True)
         
     
     def _on_training_end(self):
@@ -97,7 +106,6 @@ class GifLoggingCallback(BaseCallback):
         self.env = env
         self.save_freq = save_freq
         self.log_dir = log_dir
-        self.max_steps = env.env.max_steps
         self.name_prefix = name_prefix
 
         
@@ -170,18 +178,18 @@ class GifLoggingCallback(BaseCallback):
 
     def _create_gif(self):
         images = []
-        obs, info = self.env.reset()
-        done = False
+        obs = self.env.reset()
+        dones = np.zeros(self.env.num_envs, dtype=bool)
         step = 0
         
-        while not done and step < self.max_steps:
+        while not done:
             # Render the environment and save frame
             frame = self.env.render()
             images.append(frame)
             
             # Take a step in the environment
             action, _states = self.model.predict(obs, deterministic=True)
-            obs, reward, done,___,info = self.env.step(action)
+            obs, reward, done, info = self.env.step(action)
             step += 1
 
         #save the final frame of +ve reward
@@ -206,6 +214,12 @@ class GifLoggingCallback(BaseCallback):
     def _on_training_end(self):
         plt.close()
 
+def gen_env(seed = None, config='config.yaml'):
+    env = DataGenerator(config)
+    env.reset(seed=seed)
+    return env
+
+
 class PolicyHead:
     def __init__(self, model_config_path, data_config_path, seed=None):
         self.model_config = self.load_config(os.path.join(os.path.dirname(__file__), '../..', model_config_path))['policy_head']
@@ -215,17 +229,23 @@ class PolicyHead:
         self.policy_name = self.select_policy()
 
         #set the seed in order to create argparsable separate runs for each seed
-        self.seed = self.model_config['seed']
+        self.seed = self.model_config['seed'] if seed is None else seed
 
         print('POLICY NAME: ', self.policy_name)
-        self.parallel_train_env = self.create_parallel_envs(seed = self.seed)
-        self.train_env = self.gen_train_env(seed = self.seed)
-        self.eval_env = self.gen_test_env(seed = self.seed)
+        self.parallel_train_env = VecVideoRecorder(
+            self.create_parallel_envs(seed = self.seed), 
+            f"./logs/{self.algorithm}_{self.data_config['environment_name']}_policyviz/{self.data_config['observation_space']}/seed_{self.seed}/", 
+            record_video_trigger=lambda x: x % self.model_config['save_weight_freq'] == 0, 
+            video_length=1000, 
+            name_prefix='policy_video'
+        )
+        self.valid_env = self.create_parallel_envs(seed = self.seed)
+        self.eval_env = self.create_parallel_envs(seed = self.seed, train=False)
         self.model = self.create_models(seed=self.seed)
 
         #check that critical configs for test and train are equal 
-        assert (self.train_env.observation_space == self.eval_env.observation_space), \
-            f"ERROR: observaiton type {self.train_env.observation_space} and environment {self.eval_env.observation_space} need to be same for train and eval configs"
+        assert (self.valid_env.observation_space == self.eval_env.observation_space), \
+            f"ERROR: observaiton type {self.valid_env.observation_space} and environment {self.eval_env.observation_space} need to be same for train and eval configs"
 
        
         assert (self.parallel_train_env.observation_space == self.eval_env.observation_space), \
@@ -262,25 +282,16 @@ class PolicyHead:
         else:
             raise ValueError(f"Unsupported data type: {self.data_type}")
     
-    def create_parallel_envs(self, seed:int=0):
+    def create_parallel_envs(self, seed: int=0, train=True, num_parallel=None):
+        if num_parallel is None:
+            num_parallel = self.model_config['num_parallel_envs']
+        if train:
+            return SubprocVecEnv([lambda: gen_env(seed + i, 'config.yaml') for i in range(num_parallel)])
+        else:
+            return SubprocVecEnv([lambda: gen_env(seed + i, 'config_test.yaml') for i in range(num_parallel)])
         
-        return SubprocVecEnv([lambda: self.gen_train_env(seed) for i in range(self.model_config['num_parallel_envs'])])
-        
-
-    def gen_train_env(self, seed = None):
-        env = DataGenerator('config.yaml')
-        env.reset(seed=seed)
-        return env
-    
-    def gen_test_env(self, seed = None):
-        env = DataGenerator('config_test.yaml')
-        env.reset(seed=seed)
-        return env
 
     def create_models(self, seed: int = 0):
-
-        
-        
         if self.algorithm == "PPO":
             ppo_params = {k: v for k, v in self.model_config['ppo'].items() if v is not None}
 
@@ -317,12 +328,14 @@ class PolicyHead:
     
 
     def train_and_evaluate_policy(self):
-
-        
-        
+        wandb.init(
+            project='ssl_rl',
+            entity='waymao', 
+            name=f'{self.algorithm}_{self.data_config["environment_name"]}_{self.data_config["observation_space"]}_seed_{self.seed}',
+            sync_tensorboard=True,
+            monitor_gym=True
+        )
         train_interval = self.model_config['train_interval']
-
-        
 
         if os.path.exists(f"./logs/{self.algorithm}_{self.data_config['environment_name']}_weights/{self.data_config['observation_space']}/seed_{self.seed}") and len(os.listdir(f"./logs/{self.algorithm}_{self.data_config['environment_name']}_weights/{self.data_config['observation_space']}/seed_{self.seed}")) > 0:
             latest_weight = list(sorted(os.listdir(f"./logs/{self.algorithm}_{self.data_config['environment_name']}_weights/{self.data_config['observation_space']}/seed_{self.seed}")))
@@ -335,29 +348,40 @@ class PolicyHead:
 
             
         
-
-        reward_callback = RewardValueCallback(env = self.train_env, save_freq = self.model_config['reward_log_freq'], log_dir=f"./logs/{self.algorithm}_{self.data_config['environment_name']}_tensorboard/{self.data_config['observation_space']}/seed_{self.seed}/", csv_log_dir=f"./logs/{self.algorithm}_{self.data_config['environment_name']}_rewards/{self.data_config['observation_space']}/seed_{self.seed}/", num_envs= self.model_config['num_parallel_envs'], train=True)
-        eval_reward_callback = RewardValueCallback(env = self.eval_env, save_freq = self.model_config['reward_log_freq'], log_dir=f"./logs/{self.algorithm}_{self.data_config['environment_name']}_tensorboard/{self.data_config['observation_space']}/seed_{self.seed}/", csv_log_dir=f"./logs/{self.algorithm}_{self.data_config['environment_name']}_rewards/{self.data_config['observation_space']}/seed_{self.seed}/", num_envs = self.model_config['num_parallel_envs'], train=False)
-        gif_callback = GifLoggingCallback(env = self.train_env, save_freq = self.model_config['gif_log_freq'], log_dir = f"./logs/{self.algorithm}_{self.data_config['environment_name']}_policyviz/{self.data_config['observation_space']}/seed_{self.seed}/", num_envs= self.model_config['num_parallel_envs'], name_prefix = 'policy_gif')
+        # Use Built-in Eval Callback to support multiple parallel environments
+        reward_validation_callback = CustomEvalCallback("validation", eval_env=self.valid_env, n_eval_episodes=10, eval_freq=self.model_config['reward_log_freq'])
+        reward_eval_callback = CustomEvalCallback("eval", eval_env=self.eval_env, n_eval_episodes=10, eval_freq=self.model_config['reward_log_freq'])
+        # reward_callback = RewardValueCallback(env = self.train_env, save_freq = self.model_config['reward_log_freq'], log_dir=f"./logs/{self.algorithm}_{self.data_config['environment_name']}_tensorboard/{self.data_config['observation_space']}/seed_{self.seed}/", csv_log_dir=f"./logs/{self.algorithm}_{self.data_config['environment_name']}_rewards/{self.data_config['observation_space']}/seed_{self.seed}/", num_envs= self.model_config['num_parallel_envs'], train=True)
+        # eval_reward_callback = RewardValueCallback(env = self.eval_env, save_freq = self.model_config['reward_log_freq'], log_dir=f"./logs/{self.algorithm}_{self.data_config['environment_name']}_tensorboard/{self.data_config['observation_space']}/seed_{self.seed}/", csv_log_dir=f"./logs/{self.algorithm}_{self.data_config['environment_name']}_rewards/{self.data_config['observation_space']}/seed_{self.seed}/", num_envs = self.model_config['num_parallel_envs'], train=False)
+        
+        # VecVideoRecorder is used instead of GifLoggingCallback
+        # gif_callback = GifLoggingCallback(env = self.valid_env, save_freq = self.model_config['gif_log_freq'], log_dir = f"./logs/{self.algorithm}_{self.data_config['environment_name']}_policyviz/{self.data_config['observation_space']}/seed_{self.seed}/", num_envs= self.model_config['num_parallel_envs'], name_prefix = 'policy_gif')
         checkpoint_callback = CheckpointCallback(save_freq=self.model_config['save_weight_freq'], save_path=f"./logs/{self.algorithm}_{self.data_config['environment_name']}_weights/{self.data_config['observation_space']}/seed_{self.seed}/", name_prefix=f'{self.algorithm}_seed{self.seed}_step', save_replay_buffer=True)
 
 
         # Create the callback list
-        callback = CallbackList([reward_callback, eval_reward_callback, gif_callback, checkpoint_callback])
+        callback = CallbackList([reward_validation_callback, reward_eval_callback, checkpoint_callback])
         
         
         self.model.learn(total_timesteps=train_interval, tb_log_name=f'{self.algorithm}_{self.seed}', progress_bar = True, reset_num_timesteps=False, callback = callback)
     
 
-
-
-
 if __name__ == '__main__':
+    args = argparse.ArgumentParser()
+    args.add_argument('--seed', type=int, default=0)
+    args = args.parse_args()
+    
+    
     print(DataGenerator('config.yaml').observation_space)
     print(DataGenerator('config_test.yaml').observation_space)
+    # policy_head = PolicyHead(
+    #     SubprocVecEnv([lambda: gen_env(i) for i in range(4)]), 
+    #     SubprocVecEnv([lambda: gen_env(i) for i in range(5)]), 
+    #     SubprocVecEnv([lambda: gen_env(i, config_path='config_test.yaml') for i in range(5)]), 
     policy_head = PolicyHead( 
         'configs/models/config.yaml', 
-        'configs/data_generator/config.yaml'
+        'configs/data_generator/config.yaml',
+        seed=args.seed
     )
     policy_head.train_and_evaluate_policy()
 

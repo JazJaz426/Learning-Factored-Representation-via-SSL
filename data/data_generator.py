@@ -5,6 +5,7 @@
 from minigrid.minigrid_env import MiniGridEnv
 from minigrid.wrappers import ImgObsWrapper
 from minigrid.wrappers import FullyObsWrapper
+from gymnasium.wrappers.time_limit import TimeLimit
 import yaml
 
 import gymnasium as gym
@@ -73,6 +74,7 @@ class DataGenerator(gym.Env):
         self.env = ImgObsWrapper(self.env)
 
         self.env.max_steps = configs['max_steps']
+        self.env = TimeLimit(self.env, max_episode_steps=configs['max_steps'])
 
         # Wrap the environment to enable stochastic actions
         if configs['deterministic_action'] is False:
@@ -80,6 +82,8 @@ class DataGenerator(gym.Env):
 
         #Store the controlled factors array
         self.controlled_factors = configs['controlled_factors']
+        
+        self.render_mode = 'rgb_array'
 
         #storing the custom reset function if needed
         self.custom_resetter = CustomEnvReset(configs['environment_name'], configs['state_attributes'])
