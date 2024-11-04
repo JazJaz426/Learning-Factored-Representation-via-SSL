@@ -1,6 +1,6 @@
 import yaml
 from stable_baselines3 import PPO, DQN, A2C
-from stable_baselines3.common.logger import configure
+from stable_baselines3.common.monitor import Monitor
 from stable_baselines3.common.vec_env import SubprocVecEnv
 import numpy as np
 import sys
@@ -215,7 +215,7 @@ class GifLoggingCallback(BaseCallback):
         plt.close()
 
 def gen_env(seed = None, config='config.yaml'):
-    env = DataGenerator(config)
+    env = Monitor(DataGenerator(config))
     env.reset(seed=seed)
     return env
 
