@@ -20,15 +20,9 @@ import sys
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 from data.data_augmentor import DataAugmentor
 from data.utils.controlled_reset import CustomEnvReset
-
+from matplotlib import pyplot as plt
 
 '''
-TODO: implement video recording stored in the src folder (only during testing)
-
-
-[DONE] TODO: change the observation space based on yaml file, or output all obs together 
-[DONE] TODO: variation between deterministic or stochastic actions
-[DONE] TODO: implement (multiple) visual transformation on the observation output
 [DONE] TODO: implement (multiple) controlled environment factors at once 
     - Random bug sometimes does not allow for factored expert state to be retrieved 
 '''
@@ -88,9 +82,11 @@ class DataGenerator(gym.Env):
 
         #Store the controlled factors array
         self.controlled_factors = configs['controlled_factors']
+        
+        self.render_mode = 'rgb_array'
 
         #storing the custom reset function if needed
-        self.custom_resetter = CustomEnvReset(configs['environment_name'])
+        self.custom_resetter = CustomEnvReset(configs['environment_name'], configs['state_attributes'])
 
         # Reset the environment to initialize it
         self.env.reset()
@@ -114,7 +110,7 @@ class DataGenerator(gym.Env):
         #return the desired gym Spaces based on the observation space
 
         if self.observation_type == 'image':
-            frame = self.env.get_frame(tile_size=8)
+            frame = self.env.unwrapped.get_frame(tile_size=8)
             return gym.spaces.Box(low=0, high=255, shape=frame.shape, dtype=np.uint8)
 
         elif self.observation_type == 'expert':
@@ -146,7 +142,7 @@ class DataGenerator(gym.Env):
 
     def render(self):
         '''Implementing render() according to ABC of gymnasium env'''
-        frame = self.env.get_frame(tile_size=8)
+        frame = self.env.unwrapped.get_frame(tile_size=8)
         frame = self.data_augmentor.apply_transformation(frame)
         return frame
 
@@ -165,7 +161,7 @@ class DataGenerator(gym.Env):
         (_, reward, terminated, truncated, info) = self.env.step(action)
         
 
-        frame = self.env.get_frame(tile_size=8)
+        frame = self.env.unwrapped.get_frame(tile_size=8)
 
         #add the visual observation before augmentation for debugging
         info['original_obs'] = frame
@@ -183,12 +179,20 @@ class DataGenerator(gym.Env):
         info['state_dict'] = state
         #add the visual observation into the info for debugging
         info['obs'] = frame
+        #store original reward in case needed
+        info['original_reward'] = reward
+
+        #NOTE: newly added, modify reward to be step-penalty function
+        #reward = 1 - ((abs(state['agent_pos'][0]-state['goal_pos'][0])+abs(state['agent_pos'][1]-state['goal_pos'][1]))/(self.env.unwrapped.height + self.env.unwrapped.width))
+
 
         state = [item for sublist in state.values() for item in (sublist if isinstance(sublist, tuple) else [sublist])] 
 
 
         observation = self._get_obs(image = frame, state = state, factored = factored)
         
+
+       
 
         # #reset in case the environment is done
         # if done:
@@ -214,7 +218,7 @@ class DataGenerator(gym.Env):
             self._randomize_reset()
         
 
-        frame = self.env.get_frame(tile_size=8)
+        frame = self.env.unwrapped.get_frame(tile_size=8)
         #add the visual observation before augmentation for debugging
         info['original_obs'] = frame
 
@@ -309,7 +313,31 @@ if __name__ == '__main__':
     
     obs, info = data_generator.reset()
     obs_t, info_t = data_gen_test.reset()
+
+
+    pdb.set_trace()
+
+    max_steps = 100
+    step = 0
+
+    base_path = os.path.join('./temp/')
+    os.makedirs(base_path, exist_ok=True)
+
+    while step < max_steps:
+
+        act = int(input('Action: '))
+
+        obs, rew, term, trunc, info = data_generator.step(act)
+        
+        print('REWARD: ', rew)
+        print('TERM: ', term)
+
+        img = Image.fromarray(obs)
+        img.save(os.path.join(base_path, f'step_{step}.png'))
+
+        step += 1
     
+    pdb.set_trace()
 
     MAX_STEPS = 5
 

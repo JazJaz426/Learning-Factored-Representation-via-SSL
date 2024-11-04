@@ -1,4 +1,5 @@
-data/temp_obs
-__pycache__/
-events.out.tfevents.*
-data/src
+./data/temp_obs
+
+factored_ssl
+ssl_factored
+__pycache__
