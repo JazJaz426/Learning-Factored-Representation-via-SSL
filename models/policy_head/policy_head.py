@@ -17,6 +17,7 @@ import torch
 from matplotlib import pyplot as plt
 import re
 import pandas as pd
+import wandb
 
 import argparse
 
@@ -327,12 +328,14 @@ class PolicyHead:
     
 
     def train_and_evaluate_policy(self):
-
-        
-        
+        wandb.init(
+            project='ssl_rl',
+            entity='waymao', 
+            name=f'{self.algorithm}_{self.data_config["environment_name"]}_{self.data_config["observation_space"]}_seed_{self.seed}',
+            sync_tensorboard=True,
+            monitor_gym=True
+        )
         train_interval = self.model_config['train_interval']
-
-        
 
         if os.path.exists(f"./logs/{self.algorithm}_{self.data_config['environment_name']}_weights/{self.data_config['observation_space']}/seed_{self.seed}") and len(os.listdir(f"./logs/{self.algorithm}_{self.data_config['environment_name']}_weights/{self.data_config['observation_space']}/seed_{self.seed}")) > 0:
             latest_weight = list(sorted(os.listdir(f"./logs/{self.algorithm}_{self.data_config['environment_name']}_weights/{self.data_config['observation_space']}/seed_{self.seed}")))
@@ -362,12 +365,6 @@ class PolicyHead:
         
         self.model.learn(total_timesteps=train_interval, tb_log_name=f'{self.algorithm}_{self.seed}', progress_bar = True, reset_num_timesteps=False, callback = callback)
     
-
-
-def gen_env(seed, config_path='config.yaml'):
-    env = DataGenerator(config_path)
-    env.reset(seed=seed)
-    return env
 
 if __name__ == '__main__':
     args = argparse.ArgumentParser()
