@@ -334,7 +334,11 @@ class PolicyHead:
             name=f'{self.algorithm}_{self.data_config["environment_name"]}_{self.data_config["observation_space"]}_seed_{self.seed}',
             group=f'{self.algorithm}_{self.data_config["environment_name"]}_{self.data_config["observation_space"]}',
             sync_tensorboard=True,
-            monitor_gym=True
+            monitor_gym=True,
+            config={
+                "model": self.model_config,
+                "data": self.data_config,
+            }
         )
         train_interval = self.model_config['train_interval']
 
