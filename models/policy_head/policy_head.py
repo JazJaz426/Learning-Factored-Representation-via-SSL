@@ -9,6 +9,7 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../..')
 from data.data_generator import DataGenerator
 import pdb
 from stable_baselines3.common.callbacks import BaseCallback, CallbackList, CheckpointCallback
+from stable_baselines3.common.vec_env import VecVideoRecorder
 import imageio
 from torch.utils.tensorboard import SummaryWriter
 import gymnasium as gym
@@ -16,11 +17,12 @@ import torch
 from matplotlib import pyplot as plt
 import re
 
+from eval_callback import CustomEvalCallback
+
 class RewardValueCallback(BaseCallback):
     def __init__(self, env: gym.Env, save_freq: int, log_dir: str, verbose=0, max_steps: int = 200, train=True):
         super(RewardValueCallback, self).__init__(verbose)
         self.log_dir = log_dir
-        self.writer = SummaryWriter(log_dir)
         self.max_steps = max_steps
         self.env = env
         self.save_freq = save_freq
@@ -39,33 +41,36 @@ class RewardValueCallback(BaseCallback):
     
     def _log_rewards_and_value(self):
         # Reset the environment
-        obs, info = self.env.reset()
-        done = False
-        step = 0
-        cumulative_reward = 0
+        
+        for i in range(20):
+            obs, info = self.env.reset()
+            done = False
+            step = 0
+            cumulative_reward = 0
+            with torch.no_grad():
 
-        with torch.no_grad():
+                while not done and step < self.max_steps:
+                    # Predict action and get value function (self.model.predict returns the action and value)
+                    actions, _states = self.model.predict(obs, deterministic=True)
+                    obs, rewards, dones, __, infos = self.env.step(actions)
 
-            while not done and step < self.max_steps:
-                # Predict action and get value function (self.model.predict returns the action and value)
-                actions, _states = self.model.predict(obs, deterministic=True)
-                obs, rewards, dones, __, infos = self.env.step(actions)
+                    # Log the value function and reward to TensorBoard
+                    cumulative_reward += rewards
+                    # self.logger.record(f"{'train' if self.train else 'test'} reward per step", rewards, self.num_timesteps + step)
+                    # self.writer.add_scalar("value per step", value, self.num_timesteps + step)
 
-                # Log the value function and reward to TensorBoard
-                cumulative_reward += rewards
-                self.writer.add_scalar(f"{'train' if self.train else 'test'} reward per step", rewards, self.num_timesteps + step)
-                # self.writer.add_scalar("value per step", value, self.num_timesteps + step)
+                    step += 1
 
-                step += 1
+        # Log the cumulative reward
+        self.logger.record_mean(f"{'train' if self.train else 'test'}/cumul_reward", cumulative_reward)
+        self.logger.record_mean(f"{'train' if self.train else 'test'}/mean_ep_length", step)
+        self.logger.record_mean(f"{'train' if self.train else 'test'}/succ_rate", cumulative_reward > 0)
+        self.logger.record_mean(f"{'train' if self.train else 'test'}/avg_reward", cumulative_reward / step)
 
-            # Log the cumulative reward
-            self.writer.add_scalar(f"{'train' if self.train else 'test'} cumul reward", cumulative_reward, self.num_timesteps)
-            self.writer.add_scalar(f"{'train' if self.train else 'test'} avg reward", cumulative_reward/step, self.num_timesteps)
-
-            # Print the logged rewards
-            print("=-------------------------=")
-            print(f"{'train' if self.train else 'test'} cumul reward @ {self.num_timesteps}: ", cumulative_reward)
-            print(f"{'train' if self.train else 'test'} avg reward @ {self.num_timesteps}: ", cumulative_reward/step)
+        # Print the logged rewards
+        print("=-------------------------=")
+        print(f"{'train' if self.train else 'test'} cumul reward @ {self.num_timesteps}: ", cumulative_reward)
+        print(f"{'train' if self.train else 'test'} avg reward @ {self.num_timesteps}: ", cumulative_reward/step)
         
     
     def _on_training_end(self):
@@ -112,8 +117,8 @@ class GifLoggingCallback(BaseCallback):
 
     def _create_gif(self):
         images = []
-        obs, info = self.env.reset()
-        done = False
+        obs = self.env.reset()
+        dones = np.zeros(self.env.num_envs, dtype=bool)
         step = 0
         # pdb.set_trace()
         
@@ -124,7 +129,7 @@ class GifLoggingCallback(BaseCallback):
             
             # Take a step in the environment
             action, _states = self.model.predict(obs, deterministic=True)
-            obs, reward, done,___,info = self.env.step(action)
+            obs, reward, done, info = self.env.step(action)
             step += 1
 
        
@@ -152,7 +157,8 @@ class PolicyHead:
                  test_env,
                  eval_env, 
                  model_config_path, 
-                 data_config_path
+                 data_config_path,
+                 seed
         ):
         self.model_config = self.load_config(os.path.join(os.path.dirname(__file__), '../..', model_config_path))['policy_head']
         self.data_config = self.load_config(os.path.join(os.path.dirname(__file__), '../..', data_config_path))
@@ -161,7 +167,10 @@ class PolicyHead:
         self.policy_name = self.select_policy()
 
         print('POLICY NAME: ', self.policy_name)
-        self.train_env = train_env
+        self.train_env = VecVideoRecorder(
+            train_env, 
+            video_folder=f"./{self.algorithm}_{self.data_config['environment_name']}_policyviz/{self.data_config['observation_space']}/seed_{seed}/"
+        )
         self.test_env = test_env
         self.eval_env = eval_env
         self.models = self.create_models(num_models=self.model_config['num_models'])
@@ -264,13 +273,13 @@ class PolicyHead:
             # new_logger = configure(f"./{self.algorithm}_tensorboard/model_{seed}", ["stdout", "tensorboard"])
             # model.set_logger(new_logger)
 
-            reward_callback = RewardValueCallback(env = self.test_env, save_freq = self.model_config['reward_log_freq'], log_dir=f"./{self.algorithm}_{self.data_config['environment_name']}_tensorboard/{self.data_config['observation_space']}/seed_{seed}/", train=True)
-            eval_reward_callback = RewardValueCallback(env = self.eval_env, save_freq = self.model_config['reward_log_freq'], log_dir=f"./{self.algorithm}_{self.data_config['environment_name']}_tensorboard/{self.data_config['observation_space']}/seed_{seed}/", train=False)
-            gif_callback = GifLoggingCallback(env = self.test_env, save_freq = self.model_config['gif_log_freq'], log_dir = f"./{self.algorithm}_{self.data_config['environment_name']}_policyviz/{self.data_config['observation_space']}/seed_{seed}/", name_prefix = 'policy_gif')
+            reward_validation_callback = CustomEvalCallback("validation", eval_env=self.test_env, n_eval_episodes=10, eval_freq=self.model_config['reward_log_freq'])
+            reward_eval_callback = CustomEvalCallback("eval", eval_env=self.test_env, n_eval_episodes=10, eval_freq=self.model_config['reward_log_freq'])
+            # gif_callback = GifLoggingCallback(env = self.test_env, save_freq = self.model_config['gif_log_freq'], log_dir = f"./{self.algorithm}_{self.data_config['environment_name']}_policyviz/{self.data_config['observation_space']}/seed_{seed}/", name_prefix = 'policy_gif')
             checkpoint_callback = CheckpointCallback(save_freq=self.model_config['save_weight_freq'], save_path=f"./{self.algorithm}_{self.data_config['environment_name']}_weights/{self.data_config['observation_space']}/seed_{seed}/", name_prefix=f'{self.algorithm}_seed{seed}_step', save_replay_buffer=True)
 
             # Create the callback list
-            callback = CallbackList([reward_callback, eval_reward_callback, gif_callback, checkpoint_callback])
+            callback = CallbackList([reward_validation_callback, reward_eval_callback, checkpoint_callback])
 
             model.learn(total_timesteps=train_interval, tb_log_name=f'{self.algorithm}_{seed}', progress_bar = True, reset_num_timesteps=False, callback = callback)
             # model.save(path=f"./{self.algorithm}_weights/seed_{seed}/{self.algortihm}_seed{seed}_step{self.model.num_timesteps}")
@@ -297,8 +306,8 @@ class PolicyHead:
         pass
 
 
-def gen_env(seed):
-    env = DataGenerator('config.yaml')
+def gen_env(seed, config_path='config.yaml'):
+    env = DataGenerator(config_path)
     env.reset(seed=seed)
     return env
 
@@ -307,8 +316,8 @@ if __name__ == '__main__':
     print(DataGenerator('config_test.yaml').observation_space)
     policy_head = PolicyHead(
         SubprocVecEnv([lambda: gen_env(i) for i in range(4)]), 
-        DataGenerator('config.yaml'), 
-        DataGenerator('config_test.yaml'), 
+        SubprocVecEnv([lambda: gen_env(i) for i in range(5)]), 
+        SubprocVecEnv([lambda: gen_env(i, config_path='config_test.yaml') for i in range(5)]), 
         'configs/models/config.yaml', 
         'configs/data_generator/config.yaml'
     )
