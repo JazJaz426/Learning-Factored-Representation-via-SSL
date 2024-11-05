@@ -2,14 +2,17 @@
 some copied from EvalCallback. modified by waymao
 """
 import os
-from stable_baselines3.common.callbacks import EvalCallback, sync_envs_normalization, evaluate_policy
-from stable_baselines3.common.vec_env.vec_video_recorder import VecVideoRecorder
+from stable_baselines3.common.callbacks import BaseCallback, EvalCallback, sync_envs_normalization, evaluate_policy
+from vec_video_recorder import VecVideoRecorder
+
 import numpy as np
 from gymnasium import error, logger
-from stable_baselines3.common.vec_env.base_vec_env import VecEnv
+from stable_baselines3.common.vec_env.base_vec_env import VecEnv, VecEnvStepReturn
 from typing import Callable, List
 from matplotlib import pyplot as plt
 import gymnasium as gym
+import pandas as pd 
+import pdb
 
 #NOTE: for older RewardValueCallback used as global variable building CSV
 csv_logger = pd.DataFrame(columns=['train/test', 'step', 'seed', 'cumul_reward'])
@@ -19,113 +22,50 @@ class CustomVideoRecorder(VecVideoRecorder):
     """
     Custom Video Recorder wrapper for SB3 with following extra features:
     (1) stops video when policy is done 
-    (2) also plots the value function for learned SB3 policy
     """
     
-    def __init__(self, venv: VecEnv, base_env: gym.Env, video_folder: str, record_video_trigger: Callable[[int], bool], video_length: int = 200, name_prefix: str = "rl-video", plot_values: bool = False):
+    def __init__(self, venv: VecEnv, video_folder: str, record_video_trigger: Callable[[int], bool], video_length: int = 200, name_prefix: str = "rl-video"):
         super(CustomVideoRecorder, self).__init__(venv, video_folder, record_video_trigger, video_length, name_prefix)
 
-        self.plot_values = plot_values
-
         #[SR] extra variable to track when different environments are "done"
-        self.dones = np.array((venv.num_envs,), False)
+        self.dones = np.full((venv.num_envs,), False)
 
         #[SR] extra variable to track last observation: to preserve in case some envs are "done" before others
         self.terminal_obs = [None for _ in range(venv.num_envs)]
-
-        #[SR] add separate video folder for value logging
-        self.value_folder = os.path.join(video_folder, 'value_functions')
-        os.makedirs(self.value_folder, exist_ok=True)
-
-        self.value_name = f"{self.name_prefix}-step-{self.step_id}.png"
-        self.value_path = os.path.join(self.value_folder, self.value_name)
-
-        #[SR] dummy base env to generate value function
-        self.base_env = base_env
     
+ 
     def step_wait(self) -> VecEnvStepReturn:
-        obs, rewards, dones, infos = self.venv.step_wait()
+        
+        print('Video Recorder: ', self.step_id)
+        
+        obs, rewards, dones, infos = self.env.step_wait()
 
         #[SR] boolean or to set self.dones true: stop recording when all envs reach done
-        self.dones = np.logical_or(self.dones, dones)
+        # self.dones = np.logical_or(self.dones, dones)
 
-        #[SR] in case some dones are True, store in self.terminal_obs and reset the obs
-        for i, done in enumerate(dones):
+        # #[SR] in case some dones are True, store in self.terminal_obs and reset the obs
+        # for i, done in enumerate(dones):
 
-            if done:
-                self.terminal_obs[i] = obs
+        #     if done:
+        #         self.terminal_obs[i] = obs[i,:,:,:]
         
-        for i in range(len(obs)):
+        # for i in range(len(obs)):
 
-            if self.terminal_obs[i] != None:
-                obs[i] = self.terminal_obs[i]
+        #     if isinstance(self.terminal_obs[i], np.ndarray):
+        #         obs[i,:,:,:] = self.terminal_obs[i]
 
         self.step_id += 1
         if self.recording:
+
             self._capture_frame()
             if (self.dones.all() == True) or (len(self.recorded_frames) > self.video_length):
                 print(f"Saving video to {self.video_path}")
                 self._stop_recording()
+                
         elif self._video_enabled():
             self._start_video_recorder()
 
-            #[SR] issue call to plot value function for current state
-            self._plot_value_func()
-        
-
         return obs, rewards, dones, infos
-
-    def _plot_value_func(self):
-        '''extract the value function for a particular observation'''
-        
-        original_obs, info = self.base_env.reset()
-
-        value_function = np.zeros((self.base_env.env.unwrapped.width, self.env.env.unwrapped.height)) * np.nan
-
-
-        for w in range(self.base_env.env.unwrapped.width):
-            for h in range(self.base_env.env.unwrapped.height):
-
-                obj = self.base_env.env.unwrapped.grid.get(w, h)
-
-                if obj is None:
-
-                    # place the agent here
-                    self.base_env.env.unwrapped.agent_pos = (w, h)
-
-                    value_estim = []
-                    
-                    for dir in range(4):
-                        
-                        self.base_env.env.unwrapped.agent_dir = dir
-                        obs = self.base_env.env.unwrapped.get_frame(tile_size=8)
-
-                       
-                        
-                        obs_tensor, vector_env = self.model.policy.obs_to_tensor(obs)
-
-                        if callable(getattr(self.model.policy, "predict_values", None)):
-                            value = self.model.policy.predict_values(obs_tensor).item()
-                        elif callable(getattr(self.model, "q_net", None)):
-                            value = torch.sum(self.model.q_net(obs_tensor), dim=1).item()
-
-                        value_estim.append(value)
-
-                    value_function[w, h] = np.mean(value_estim)
-        
-        
-        #normalize the value function so it is 0-1
-        value_function = value_function / np.nansum(value_function)
-
-        #plotting value function over the observation
-        fig = plt.figure(frameon=False)
-        plt.imshow(original_obs)
-        plot_extent = [0, self.base_env.env.unwrapped.width * 8, self.base_env.env.unwrapped.height * 8, 0]
-        plt.imshow(value_function, alpha=0.5, cmap='viridis', extent = plot_extent)
-        plt.colorbar()
-        plt.title(f"Value Function @ Step {self.step_id}")
-        plt.savefig(self.value_path)
-        plt.close()
 
 class CustomEvalCallback(EvalCallback):
     """
@@ -133,16 +73,23 @@ class CustomEvalCallback(EvalCallback):
     name for logging.
     """
     def __init__(self, custom_name, eval_env, gamma=None, *args, **kwargs):
+        #TODO: chekc kwargs input into model, correctly passed to super() EvalCallback
         self.custom_name = custom_name
         self.gamma = gamma
         super(CustomEvalCallback, self).__init__(eval_env, *args, **kwargs)
+
+        self.mean_evaluations_results = []
+        self.std_evaluations_results = []
+        self.mean_evaluations_length = []
+        self.std_evaluations_length = []
 
     def _on_step(self) -> bool:
         # NOTE: this function is identical to the original _on_step function
         # but with the addition of the custom name for logging
         continue_training = True
 
-        if self.eval_freq > 0 and (self.n_calls % self.eval_freq)== 0:
+        #[SR] divided by self.eval_env.num_envs for periodic logging
+        if self.eval_freq > 0 and (self.n_calls % (self.eval_freq // self.eval_env.num_envs))== 0:
             # Sync training and eval env if there is VecNormalize
             if self.model.get_vec_normalize_env() is not None:
                 try:
@@ -172,6 +119,10 @@ class CustomEvalCallback(EvalCallback):
                 self.evaluations_timesteps.append(self.num_timesteps)
                 self.evaluations_results.append(episode_rewards)
                 self.evaluations_length.append(episode_lengths)
+                self.mean_evaluations_results.append(np.mean(episode_rewards))
+                self.std_evaluations_results.append(np.std(episode_rewards))
+                self.mean_evaluations_length.append(np.mean(episode_lengths))
+                self.std_evaluations_length.append(np.std(episode_lengths))
 
                 kwargs = {}
                 # Save success log if present
@@ -183,7 +134,11 @@ class CustomEvalCallback(EvalCallback):
                     self.log_path,
                     timesteps=self.evaluations_timesteps,
                     results=self.evaluations_results,
+                    mean_results = self.mean_evaluations_results,
+                    std_results = self.std_evaluations_results,
                     ep_lengths=self.evaluations_length,
+                    mean_ep_lengths = self.mean_evaluations_length,
+                    std_ep_lengths = self.std_evaluations_length,
                     **kwargs,
                 )
 
@@ -191,21 +146,30 @@ class CustomEvalCallback(EvalCallback):
             mean_ep_length, std_ep_length = np.mean(episode_lengths), np.std(episode_lengths)
             if self.gamma is not None:
                 mean_discounted_return = np.mean(episode_rewards * np.power(self.gamma, episode_lengths))
+                std_discounted_return = np.std(episode_rewards * np.power(self.gamma, episode_lengths))
             self.last_mean_reward = mean_reward
 
             if self.verbose >= 1:
-                print(f"{self.custom_name}: Eval num_timesteps={self.num_timesteps}, " f"episode_reward={mean_reward:.2f} +/- {std_reward:.2f}")
+                print("=----------------------------=")
+                print(f"{self.custom_name}: num_timesteps={self.num_timesteps}, " f"episode_reward={mean_reward:.2f} +/- {std_reward:.2f}")
                 print(f"Episode length: {mean_ep_length:.2f} +/- {std_ep_length:.2f}")
             # Add to current Logger
             self.logger.record(f"eval/{self.custom_name}/mean_reward", float(mean_reward))
+            self.logger.record(f"eval/{self.custom_name}/std_reward", float(std_reward))
             self.logger.record(f"eval/{self.custom_name}/mean_ep_length", mean_ep_length)
+            self.logger.record(f"eval/{self.custom_name}/std_ep_length", std_ep_length)
             if self.gamma is not None:
                 self.logger.record(f"eval/{self.custom_name}/mean_discounted_return", float(mean_discounted_return))
+                self.logger.record(f"eval/{self.custom_name}/std_discounted_return", float(std_discounted_return))
+
+
 
             if len(self._is_success_buffer) > 0:
                 success_rate = np.mean(self._is_success_buffer)
                 if self.verbose >= 1:
                     print(f"Success rate: {100 * success_rate:.2f}%")
+                    print("=----------------------------=")
+
                 self.logger.record(f"eval/{self.custom_name}/success_rate", success_rate)
 
             # Dump log so the evaluation results are printed with the correct timestep
@@ -229,8 +193,98 @@ class CustomEvalCallback(EvalCallback):
         return continue_training
 
 
+class ValuePlottingCallback(BaseCallback):
+
+    def __init__(self, env: gym.Env, save_freq: int, log_dir: str, num_envs: int, name_prefix: str = "", verbose=1):
+        super(ValuePlottingCallback, self).__init__(verbose)
+
+        #[SR] dummy base env to generate value function
+        self.base_env = env
+        self.save_freq = save_freq
+        self.log_dir = log_dir
+        self.name_prefix = name_prefix
 
 
+        #[SR] add separate video folder for value logging
+        self.value_folder = os.path.join(log_dir, 'value_functions')
+        os.makedirs(self.value_folder, exist_ok=True)
+
+        
+
+        self.num_envs = num_envs
+        os.makedirs(self.log_dir, exist_ok=True)
+
+    def _on_step(self) -> bool:
+        
+        # Save a GIF every save_freq steps
+        if self.n_calls % (self.save_freq//self.num_envs) == 0:
+            self._plot_value_func()
+            
+        return True
+   
+    def _plot_value_func(self):
+        '''extract the value function for a particular observation'''
+        print('Value Function: ', self.num_timesteps)
+        original_obs, info = self.base_env.reset()
+
+        value_function = np.zeros((self.base_env.env.env.unwrapped.width, self.base_env.env.env.unwrapped.height)) * np.nan
+
+
+        for w in range(self.base_env.env.env.unwrapped.width):
+            for h in range(self.base_env.env.env.unwrapped.height):
+
+                obj = self.base_env.env.env.unwrapped.grid.get(w, h)
+
+                if obj is None:
+
+                    # place the agent here
+                    self.base_env.env.env.unwrapped.agent_pos = (w, h)
+
+                    value_estim = []
+                    
+                    for dir in range(4):
+                        
+                        self.base_env.env.env.unwrapped.agent_dir = dir
+                        obs = self.base_env.env.env.unwrapped.get_frame(tile_size=8)
+
+                       
+                        
+                        obs_tensor, vector_env = self.model.policy.obs_to_tensor(obs)
+
+                        if callable(getattr(self.model.policy, "predict_values", None)):
+                            value = self.model.policy.predict_values(obs_tensor).item()
+                        elif callable(getattr(self.model, "q_net", None)):
+                            value = torch.sum(self.model.q_net(obs_tensor), dim=1).item()
+
+                        value_estim.append(value)
+
+                    value_function[w, h] = np.mean(value_estim)
+        
+        
+        #normalize the value function so it is 0-1
+        value_function = value_function / np.nansum(value_function)
+
+        #plotting value function over the observation
+        fig = plt.figure(frameon=False)
+        plt.imshow(original_obs)
+        plot_extent = [0, self.base_env.env.env.unwrapped.width * 8, self.base_env.env.env.unwrapped.height * 8, 0]
+        plt.imshow(value_function, alpha=0.5, cmap='viridis', extent = plot_extent)
+        plt.colorbar()
+        plt.title(f"Value Function @ Step {self.num_timesteps}")
+
+
+        value_name = f"{self.name_prefix}-step-{self.num_timesteps}.png"
+        value_path = os.path.join(self.value_folder, value_name)
+
+        plt.savefig(value_path)
+        plt.close()
+
+    def _on_training_end(self):
+        plt.close()
+
+
+
+#NOTE: RewardValueCallback is not used
 
 class RewardValueCallback(BaseCallback):
     def __init__(self, env: gym.Env, save_freq: int, log_dir: str, csv_log_dir: str, num_envs:int, verbose=0, train=True):
@@ -302,118 +356,3 @@ class RewardValueCallback(BaseCallback):
     
     def _on_training_end(self):
         self.writer.close()
-
-class GifLoggingCallback(BaseCallback):
-    def __init__(self, env: gym.Env, save_freq: int, log_dir: str, num_envs: int, name_prefix: str = "", verbose=1):
-        super(GifLoggingCallback, self).__init__(verbose)
-        self.env = env
-        self.save_freq = save_freq
-        self.log_dir = log_dir
-        self.name_prefix = name_prefix
-
-        
-
-        self.num_envs = num_envs
-        os.makedirs(self.log_dir, exist_ok=True)
-        # self.writer = SummaryWriter(log_dir)
-
-    def _on_step(self) -> bool:
-        
-        # Save a GIF every save_freq steps
-        if self.n_calls % (self.save_freq//self.num_envs) == 0:
-            # self._create_gif()
-            self._create_value_func()
-            
-        return True
-    
-    def _create_value_func(self):
-        '''extract the value function for a particular observation'''
-        
-        original_obs, info = self.env.reset()
-
-        value_function = np.zeros((self.env.env.unwrapped.width, self.env.env.unwrapped.height)) * np.nan
-
-
-        for w in range(self.env.env.unwrapped.width):
-            for h in range(self.env.env.unwrapped.height):
-
-                obj = self.env.env.unwrapped.grid.get(w, h)
-
-                if obj is None:
-
-                    # place the agent here
-                    self.env.env.unwrapped.agent_pos = (w, h)
-
-                    value_estim = []
-                    
-                    for dir in range(4):
-                        
-                        self.env.env.unwrapped.agent_dir = dir
-                        obs = self.env.env.unwrapped.get_frame(tile_size=8)
-
-                       
-                        
-                        obs_tensor, vector_env = self.model.policy.obs_to_tensor(obs)
-
-                        if callable(getattr(self.model.policy, "predict_values", None)):
-                            value = self.model.policy.predict_values(obs_tensor).item()
-                        elif callable(getattr(self.model, "q_net", None)):
-                            value = torch.sum(self.model.q_net(obs_tensor), dim=1).item()
-
-                        value_estim.append(value)
-
-                    value_function[w, h] = np.mean(value_estim)
-        
-        
-        #normalize the value function so it is 0-1
-        value_function = value_function / np.nansum(value_function)
-
-        #plotting value function over the observation
-        fig = plt.figure(frameon=False)
-        plt.imshow(original_obs)
-        plot_extent = [0, self.env.env.unwrapped.width * 8, self.env.env.unwrapped.height * 8, 0]
-        plt.imshow(value_function, alpha=0.5, cmap='viridis', extent = plot_extent)
-        plt.colorbar()
-        plt.title(f"Value Function @ Step {self.num_timesteps}")
-        plt.savefig(os.path.join(self.log_dir, f"{self.name_prefix}_value_step_{self.num_timesteps}.png"))
-        plt.close()
-
-
-    def _create_gif(self):
-        images = []
-        obs = self.env.reset()
-        dones = np.zeros(self.env.num_envs, dtype=bool)
-        step = 0
-        
-        while not done:
-            # Render the environment and save frame
-            frame = self.env.render()
-            images.append(frame)
-            
-            # Take a step in the environment
-            action, _states = self.model.predict(obs, deterministic=True)
-            obs, reward, done, info = self.env.step(action)
-            step += 1
-
-        #save the final frame of +ve reward
-        frame = self.env.render()
-        images.append(frame)
-       
-
-        gif_path = os.path.join(self.log_dir, f"{self.name_prefix}_policy_step_{self.num_timesteps}.gif")
-        imageio.mimsave(gif_path, [np.array(img) for img in images], fps=5)
-
-        
-        # vid_tensor: (N,T,C,H,W). The values should lie in [0, 255] for type uint8 or [0, 1] for type float.
-        #self.writer.add_video(f"{self.name_prefix}_policy_step_{self.num_timesteps}", vid_tensor, global_step=self.num_timesteps, fps=4, walltime=None)
-
-    def _log_gif_to_tensorboard(self, gif_path: str):
-        # Read the GIF as bytes and log to TensorBoard
-        with open(gif_path, 'rb') as f:
-            gif_bytes = f.read()
-
-        self.writer.add_image(f"{self.name_prefix}_policy_step_{self.num_timesteps}", gif_bytes, self.num_timesteps, dataformats="HWC")
-
-    def _on_training_end(self):
-        plt.close()
-
