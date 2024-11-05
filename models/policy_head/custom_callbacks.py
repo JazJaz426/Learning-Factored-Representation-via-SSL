@@ -2,7 +2,8 @@
 some copied from EvalCallback. modified by waymao
 """
 import os
-from stable_baselines3.common.callbacks import BaseCallback, EvalCallback, sync_envs_normalization, evaluate_policy
+from stable_baselines3.common.callbacks import BaseCallback, EvalCallback, sync_envs_normalization
+from stable_baselines3.common.evaluation import evaluate_policy
 from vec_video_recorder import VecVideoRecorder
 
 import numpy as np
