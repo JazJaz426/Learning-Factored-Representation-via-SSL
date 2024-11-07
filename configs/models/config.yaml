@@ -12,16 +12,16 @@ policy_head:
   wandb_log: true
 
   ppo:
-    # n_steps: 1000
-    # n_epochs: 20
-    # learning_rate: 0.0008
-    # batch_size: 100
-    # gamma: 0.99
-    # gae_lambda: 0.96
-    # clip_range: 0.2
-    # clip_range_vf: null
-    # normalize_advantage: True
-    # ent_coef: 0.01
+    # n_steps: 2048
+    # n_epochs: 10
+    # learning_rate: 0.0003
+    # batch_size: 256
+    # gamma: 0.98
+    # gae_lambda: 0.9
+    # clip_range: 0.15
+    # clip_range_vf: 0.65
+    # # normalize_advantage: True
+    # ent_coef: 0.005
     # max_grad_norm: 0.5
     target_kl: null
     verbose: null

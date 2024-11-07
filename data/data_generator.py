@@ -168,7 +168,9 @@ class DataGenerator(gym.Env):
         
         #apply image transformations if needed
         frame = self.data_augmentor.apply_transformation(frame)
+        
 
+    
         state = self._construct_state()
         factored = None
 
@@ -183,6 +185,8 @@ class DataGenerator(gym.Env):
         info['original_reward'] = reward
         
         info['is_success'] = reward > 0 and terminated
+
+        info['dist_goal'] = abs(state['agent_pos'][0]-state['goal_pos'][0]) + abs(state['agent_pos'][1]-state['goal_pos'][1])
 
         #NOTE: newly added, modify reward to be step-penalty function
         #reward = 1 - ((abs(state['agent_pos'][0]-state['goal_pos'][0])+abs(state['agent_pos'][1]-state['goal_pos'][1]))/(self.env.unwrapped.height + self.env.unwrapped.width))
@@ -226,7 +230,7 @@ class DataGenerator(gym.Env):
 
         #apply image transformations if needed
         frame = self.data_augmentor.apply_transformation(frame)
-
+        
         state = self._construct_state()
         factored = None
 
