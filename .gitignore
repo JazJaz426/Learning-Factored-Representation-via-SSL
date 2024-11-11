@@ -4,3 +4,5 @@ factored_ssl
 ssl_factored
 __pycache__
 logs/
+wandb/
+sbatch_out/

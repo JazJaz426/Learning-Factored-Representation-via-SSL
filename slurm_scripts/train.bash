@@ -1,11 +1,11 @@
 #!/bin/bash
 #SBATCH -n 6
 #SBATCH -N 1
-#SBATCH --mem=64G
-#SBATCH -t 48:00:00
+#SBATCH --mem=32G
+#SBATCH -t 24:00:00
 
 ### modify seed below
-#SBATCH --array=41-42
+#SBATCH --array=0-0
 #SBATCH --partition=3090-gcondo
 #SBATCH --gres=gpu:1
 

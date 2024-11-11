@@ -154,21 +154,19 @@ class PolicyHead:
     
 
     def train_and_evaluate_policy(self):
-
-        if self.model_config['wandb_log']:
-            wandb.init(
-                project='ssl-factored-reps',
-                entity='shreyasraman', 
-                name=f'{self.algorithm}_{self.data_config["environment_name"]}_{self.data_config["observation_space"]}_seed{self.seed}',
-                group=f'{self.algorithm}_{self.data_config["environment_name"]}_{self.data_config["observation_space"]}',
-                sync_tensorboard=True,
-                monitor_gym=True,
-                config={
-                    "model": self.model_config,
-                    "data": self.data_config,
-                    "seed": self.seed
-                }
-            )
+        wandb.init(
+            project='ssl_rl',
+            entity='ssl-factored-reps', 
+            name=f'{self.algorithm}_{self.data_config["environment_name"]}_{self.data_config["observation_space"]}_seed_{self.seed}',
+            group=f'{self.algorithm}_{self.data_config["environment_name"]}_{self.data_config["observation_space"]}',
+            sync_tensorboard=True,
+            monitor_gym=True,
+            config={
+                "model": self.model_config,
+                "data": self.data_config,
+                "seed": self.seed
+            }
+        )
         train_interval = self.model_config['train_interval']
 
         if os.path.exists(f"./logs/{self.algorithm}_{self.data_config['environment_name']}_weights/{self.data_config['observation_space']}/seed_{self.seed}") and len(os.listdir(f"./logs/{self.algorithm}_{self.data_config['environment_name']}_weights/{self.data_config['observation_space']}/seed_{self.seed}")) > 0:
