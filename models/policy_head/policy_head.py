@@ -170,12 +170,14 @@ class PolicyHead:
         train_interval = self.model_config['train_interval']
 
         if os.path.exists(f"./logs/{self.algorithm}_{self.data_config['environment_name']}_weights/{self.data_config['observation_space']}/seed_{self.seed}") and len(os.listdir(f"./logs/{self.algorithm}_{self.data_config['environment_name']}_weights/{self.data_config['observation_space']}/seed_{self.seed}")) > 0:
-            
-            #fetch the best weights for the model rather than latest
-            best_weight = os.listdir(f"./logs/{self.algorithm}_{self.data_config['environment_name']}_weights/{self.data_config['observation_space']}/seed_{self.seed}/best_weight")[0].split('.')[0]
-            final_path = os.path.join(f"./logs/{self.algorithm}_{self.data_config['environment_name']}_weights/{self.data_config['observation_space']}/seed_{self.seed}/best_weight", best_weight)
+            try:
+                #fetch the best weights for the model rather than latest
+                best_weight = os.listdir(f"./logs/{self.algorithm}_{self.data_config['environment_name']}_weights/{self.data_config['observation_space']}/seed_{self.seed}/best_weight")[0].split('.')[0]
+                final_path = os.path.join(f"./logs/{self.algorithm}_{self.data_config['environment_name']}_weights/{self.data_config['observation_space']}/seed_{self.seed}/best_weight", best_weight)
 
-            self.model.load(path = final_path, env = self.parallel_train_env)
+                self.model.load(path = final_path, env = self.parallel_train_env)
+            except:
+                pass
 
             
         # Use Built-in Eval Callback to support multiple parallel environments
