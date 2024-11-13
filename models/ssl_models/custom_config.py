@@ -24,6 +24,7 @@ from stable_ssl.joint_embedding import (
     VICRegConfig,
     WMSEConfig,
 )
+
 from stable_ssl.config import (
     OptimConfig,
     HardwareConfig,
@@ -32,7 +33,7 @@ from stable_ssl.config import (
 )
 
 from src.ssl_dataset.base import DataConfig
-
+from ssl_models.factored_models import CovarianceFactorizationConfig, MaskingFactorizationConfig
 
 _MODEL_CONFIGS = {
     "Supervised": ModelConfig,
@@ -40,6 +41,8 @@ _MODEL_CONFIGS = {
     "BarlowTwins": BarlowTwinsConfig,
     "VICReg": VICRegConfig,
     "WMSE": WMSEConfig,
+    "CovarianceFactorizationConfig": CovarianceFactorizationConfig,
+    "MaskingFactorizationConfig": MaskingFactorizationConfig,
 }
 
 _LOG_CONFIGS = {
