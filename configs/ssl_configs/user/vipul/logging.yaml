@@ -1,4 +1,3 @@
 hydra:
   sweep:
     dir: multirun/${now:%Y-%m-%d}/${model.name}_${data.train_on}_${now:%H-%M-%S}
-    subdir: ${corruption_type}_data=${data_noise}_aug=${augmentation_noise}_model=${model.backbone_model}_seed=${hardware.seed}_job=${hydra.job.num}
