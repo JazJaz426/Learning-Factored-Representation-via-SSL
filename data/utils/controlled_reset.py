@@ -69,7 +69,7 @@ class CustomEnvReset:
          
         return True, None
 
-    def _custom_reset_doorkey(self, env, width, height, controlled_factors):
+    def _custom_reset_doorkey(self, env, width, height, controlled_factors={}):
 
         #change the random seed locally 
         curr_rng = env.unwrapped.np_random
@@ -228,7 +228,7 @@ class CustomEnvReset:
 
         return env
 
-    def _custom_reset_empty(self, env, width, height, controlled_factors):
+    def _custom_reset_empty(self, env, width, height, controlled_factors={}):
         #change the random seed locally 
         curr_rng = env.unwrapped.np_random
         local_rng = np.random.default_rng(int(100*random.random()))
@@ -307,7 +307,7 @@ class CustomEnvReset:
         env.unwrapped.mission = "get to the green goal square"
         return env
         
-    def _custom_reset_fourrooms(self, env, width, height, controlled_factors):
+    def _custom_reset_fourrooms(self, env, width, height, controlled_factors={}):
 
         #change the random seed locally 
         curr_rng = env.unwrapped.np_random
@@ -424,7 +424,7 @@ class CustomEnvReset:
         return env
 
 
-    def _custom_reset_lavacrossing(self, env, width, height, controlled_factors):
+    def _custom_reset_lavacrossing(self, env, width, height, controlled_factors={}):
 
         #change the random seed locally 
         curr_rng = env.unwrapped.np_random

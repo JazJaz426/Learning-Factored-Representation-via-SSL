@@ -58,10 +58,8 @@ class CustomDataset(Dataset):
 
         elif self.mode == 'cont':
 
-            #uniformly sample across all factors
-            sampled_factors = self.sample_factors()
-
-            self.data_env.env = self.data_env.custom_resetter.factored_reset(self.data_env.env, self.data_env.env.unwrapped.grid.height, self.data_env.env.unwrapped.grid.width, sampled_factors)
+            #NOTE: input controlled_factors as empty dictionary so that all factors are randomized following env rules
+            self.data_env.env = self.data_env.custom_resetter.factored_reset(self.data_env.env, self.data_env.env.unwrapped.grid.height, self.data_env.env.unwrapped.grid.width, {})
 
             #get the current visual observation and underlying state
             obs = self.data_env.get_curr_obs()
