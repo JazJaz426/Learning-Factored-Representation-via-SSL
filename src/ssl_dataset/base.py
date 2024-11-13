@@ -24,44 +24,36 @@ class DisentangledAugmentation:
 
     Parameters
     ----------
-    corruptions : list[tuple[str, dict]]
-        The corruptions/transformations to apply. For example:
+    disentagle : list[tuple[str, dict]]
+        The disentaglement/transformations to apply. For example:
         ```
-        "CustomGaussianNoise":{"severity":1}
+        "AlterOneFactor":{"p":0.5}
         ```
     """
 
-    corruptions: list[dict] = None
+    disentagle: list[dict] = None
 
     def __post_init__(self):
         """Initialize the corruptions configuration."""
-        if self.corruptions is None:
-            self.corruptions = [{}]
-            self._corruption = v2.Compose([v2.Identity()])
+        if self.disentagle is None:
+            self.disentagle = [{}]
+            self._disentagle = v2.Compose([v2.Identity()])
         else:
-            self._corruption = v2.Compose(
-                [TransformConfig(**t) for t in self.corruptions]
+            self._disentagle = v2.Compose(
+                [TransformConfig(**t) for t in self.disentagle]
             )
 
     def __call__(self, x):
-        return self._corruption(x)
+        return self._disentagle(x)
 
 
 class FrozenNoiseDataset(Dataset):
-    def __init__(self, dataset, noise_transform=None, transforms=None):
+    def __init__(self, dataset, disentangle_transform=None, transforms=None):
         self.dataset = dataset
-        self.noise_transform = noise_transform
+        self.disentangle_transform = disentangle_transform
         self.transforms = transforms
         self.classes = dataset.classes
         self.class_to_idx = dataset.class_to_idx
-
-        # self.generate_figure = False  # just switch this to 1 to generate figures with imagenetc_paper.figures.yaml file
-        # if HydraConfig.get().job.config_name == "imagenetc_paper_figures.yaml":
-        #     self.generate_figure = True
-        # self.count = 0
-        # # print(HydraConfig.get().overrides.task)  # ['corruption_type=Contrast', 'data_noise=2', 'augmentation_noise=0', 'org_configs@_global_=brown/run_slurm', '++hardware.seed=100']
-        # overrides = [x.split("=")[-1] for x in HydraConfig.get().overrides.task]
-        # self.run_time = overrides[0] + '_' + overrides[1] + '_' + time.strftime('%H-%M-%S')
 
     def __len__(self):
         return len(self.dataset)
@@ -69,33 +61,11 @@ class FrozenNoiseDataset(Dataset):
     def __getitem__(self, idx):
         x, y = self.dataset[idx]
 
-        # if self.generate_figure:
-        #     x.save(get_original_cwd()+f"/figures/{self.run_time}_{idx}_clean.png", format="PNG")
-
-        if self.noise_transform is not None:
-            np_random_state = np.random.get_state()
-            np.random.seed(idx)
-            x = self.noise_transform(x)
-            np.random.set_state(np_random_state)
-
-        # if self.generate_figure:
-        #     # x.save(get_original_cwd()+f"/figures/{self.run_time}_{idx}_data_noise.png", format="PNG")
-        #     cx = copy.deepcopy(x)
-        #     copy_transform = copy.deepcopy(self.transforms)
-        #     for view in copy_transform.transforms:
-        #         view._transform.transforms = view._transform.transforms[:-2]
-        #     cx = copy_transform(cx)
-        #     if type(cx) is not list:
-        #         cx = [cx]
-        #     for i in range(len(cx)):
-        #         cx[i].save(get_original_cwd()+f"/figures/{self.run_time}_{idx}_{copy_transform.transforms[i].name}.png", format="PNG")
-        #     self.count += 1
-
         if self.transforms is not None:
-            x = self.transforms(x)
+            x = self.transforms(x)  # this will be more than 1 positive view returned
 
-        # if self.generate_figure and self.count > 1:
-        #     exit(0)
+        if self.disentangle_transform is not None:
+            x = [self.disentangle_transform(i) for i in x]  # this will need to work on more than one input samples
 
         return x, y
 
@@ -115,7 +85,7 @@ class DatasetConfig(base.DatasetConfig):
     """
 
     dataset_type: str = "TorchvisionDataset"
-    corruptions: DisentangledAugmentation = None
+    disentangle: DisentangledAugmentation = None
 
     def __post_init__(self):
         logging.info(
@@ -129,9 +99,9 @@ class DatasetConfig(base.DatasetConfig):
                 for name, t in self.transforms.items()
             ]
         logging.info(
-                f"Using {self.corruptions} for data corruptions."
+                f"Using {self.disentangle} for compositional disentanglement."
             )
-        self.corruptions = DisentangledAugmentation(self.corruptions)
+        self.disentangle = DisentangledAugmentation(self.disentangle)
 
     def get_dataset(self):
         """
@@ -155,7 +125,7 @@ class DatasetConfig(base.DatasetConfig):
                 root=os.path.join(self.path),
             )
         # transforms need to be passed to frozen noise dataset and for that to happen we need to override get_dataset
-        dataset = FrozenNoiseDataset(dataset, self.corruptions, transforms=Sampler(self.transforms))
+        dataset = FrozenNoiseDataset(dataset, self.disentangle, transforms=Sampler(self.transforms))
         return dataset
 
 
