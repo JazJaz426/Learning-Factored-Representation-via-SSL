@@ -2,7 +2,7 @@
 
 defaults:
   - _self_
-  - /org_configs@_global_: brown/run_slurm
+  - /user@_global_: vipul/run_slurm
 
 hydra:
   launcher:
@@ -15,13 +15,9 @@ hydra:
 
 batch_size_across_gpus: 256
 
-data_noise: 0
-augmentation_noise: 0
-corruption_type: CustomGaussianNoise
-
 data:
   train_on: cifar10
-  dataset_type: CorruptedTorchvisionDataset
+  dataset_type: CustomTorchvisionDataset
   cifar10:
     name: CIFAR10
     path: ${local_data_path.cifar10_path}
@@ -30,15 +26,8 @@ data:
     shuffle: True
     split: train
     num_workers: -1
-    corruptions:
-      - name: ${corruption_type}
-        kwargs:
-          severity: ${data_noise}
     transforms:
       view1:
-      - name: ${corruption_type}
-        kwargs:
-          severity: ${augmentation_noise}
       - name: RandomResizedCrop
         kwargs:
           size: 32
@@ -59,9 +48,6 @@ data:
         kwargs:
           p: 0.2
       view2:
-      - name: ${corruption_type}
-        kwargs:
-          severity: ${augmentation_noise}
       - name: RandomResizedCrop
         kwargs:
           size: 32
@@ -86,77 +72,13 @@ data:
           threshold: 128
           p: 0.2
 
-  cifar10_severity_0:
+  cifar10_test:
     name: CIFAR10
     path: ${local_data_path.cifar10_path}
     batch_size: ${batch_size_across_gpus}
     drop_last: False
     num_workers: -1
     split: test
-    corruptions:
-      - name: ${corruption_type}
-        kwargs:
-          severity: 0
-
-  cifar10_severity_1:
-    name: CIFAR10
-    path: ${local_data_path.cifar10_path}
-    batch_size: ${batch_size_across_gpus}
-    drop_last: False
-    num_workers: -1
-    split: test
-    corruptions:
-      - name: ${corruption_type}
-        kwargs:
-          severity: 1
-
-  cifar10_severity_2:
-    name: CIFAR10
-    path: ${local_data_path.cifar10_path}
-    batch_size: ${batch_size_across_gpus}
-    drop_last: False
-    num_workers: -1
-    split: test
-    corruptions:
-      - name: ${corruption_type}
-        kwargs:
-          severity: 2
-
-  cifar10_severity_3:
-    name: CIFAR10
-    path: ${local_data_path.cifar10_path}
-    batch_size: ${batch_size_across_gpus}
-    drop_last: False
-    num_workers: -1
-    split: test
-    corruptions:
-      - name: ${corruption_type}
-        kwargs:
-          severity: 3
-
-  cifar10_severity_4:
-    name: CIFAR10
-    path: ${local_data_path.cifar10_path}
-    batch_size: ${batch_size_across_gpus}
-    drop_last: False
-    num_workers: -1
-    split: test
-    corruptions:
-      - name: ${corruption_type}
-        kwargs:
-          severity: 4
-
-  cifar10_severity_5:
-    name: CIFAR10
-    path: ${local_data_path.cifar10_path}
-    batch_size: ${batch_size_across_gpus}
-    drop_last: False
-    num_workers: -1
-    split: test
-    corruptions:
-      - name: ${corruption_type}
-        kwargs:
-          severity: 5
 
 model:
   name: SimCLR

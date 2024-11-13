@@ -1,19 +1,27 @@
+# @package _global_
+
 defaults:
-  - override hydra/launcher: submitit_slurm
+  - _self_
+  - /user@_global_: vipul/run_slurm
 
 hydra:
   launcher:
     tasks_per_node: ${hardware.world_size}
     gpus_per_node: ${hardware.world_size}
-    partition: gpu
-    cpus_per_task: 4
-    timeout_min: 60
+    cpus_per_task: 8
+    mem_gb: 30
+    timeout_min: 600
+    max_num_timeout: 10
+
+batch_size_across_gpus: 256
+
 
 data:
   train_on: base
   base:
     name: CIFAR10
-    batch_size: 256
+    path: ${local_data_path.cifar10_path}
+    batch_size: ${batch_size_across_gpus}
     drop_last: True
     shuffle: True
     split: train
@@ -67,7 +75,8 @@ data:
           p: 0.2
   test_out:
     name: CIFAR10
-    batch_size: 256
+    path: ${local_data_path.cifar10_path}
+    batch_size: ${batch_size_across_gpus}
     drop_last: False
     num_workers: -1
     split: test
@@ -89,4 +98,9 @@ hardware:
   seed: 0
   float16: true
   gpu_id: 0
-  world_size: 4
+  world_size: 1
+
+log:
+  save_final_model: true
+  eval_every_epoch: 50
+  log_every_step: 150
