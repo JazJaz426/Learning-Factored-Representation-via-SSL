@@ -65,6 +65,7 @@ class DataGenerator(gym.Env):
         # Configs from the yaml file
         self.observation_type = configs['observation_space']
         self.state_attributes = configs['state_attributes']
+        self.state_attribute_types = configs['state_attribute_types']
         self.reset_type = configs['reset_type']
 
         # Create the environment
@@ -116,7 +117,7 @@ class DataGenerator(gym.Env):
 
         elif self.observation_type == 'expert':
             
-            gym_space_params = {'boolean': (0, 1, int), 'coordinate_width': (0, self.env.grid.width, int), 'coordinate_height': (0, self.env.grid.height, int), 'agent_dir': (0, 3, int)}
+            self.gym_space_params = {'boolean': (0, 1, int), 'coordinate_width': (0, self.env.grid.width, int), 'coordinate_height': (0, self.env.grid.height, int), 'agent_dir': (0, 3, int)}
 
             relevant_state_variables = list(self._construct_state().keys())
 
@@ -127,7 +128,7 @@ class DataGenerator(gym.Env):
 
                 for t in types:
                     
-                    space_param = gym_space_params[t]
+                    space_param = self.gym_space_params[t]
 
                     min_values = np.append(min_values, space_param[0])
                     max_values = np.append(max_values, space_param[1])
@@ -141,6 +142,11 @@ class DataGenerator(gym.Env):
         elif self.observation_type == 'factored':
             raise NotImplementedError('ERROR: to be implemented after factored representation encoder')
 
+    def get_low_high_attr(self, attr):
+        (low, high, typ) = self.gym_space_params[self.state_attribute_types[attr]]
+
+        return low, high, typ
+            
     def render(self):
         '''Implementing render() according to ABC of gymnasium env'''
         frame = self.env.unwrapped.get_frame(tile_size=8)
