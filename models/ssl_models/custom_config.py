@@ -4,6 +4,13 @@ because there are some datasets which are part of .custom_data that we want to
 use. If we're just using the DataConfig of Stable-SSL along with its
 transformations then we don't need this custom_config.py file.
 """
+import sys
+import os
+
+# Add the parent folder to sys.path
+parent_dir = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, os.path.dirname(parent_dir))
+
 from dataclasses import make_dataclass, dataclass, field
 import logging
 
@@ -24,7 +31,7 @@ from stable_ssl.config import (
     WandbConfig,
 )
 
-from src.ssl_dataset import DataConfig
+from src.ssl_dataset.base import DataConfig
 
 
 _MODEL_CONFIGS = {

@@ -5,6 +5,12 @@ import torch
 import os
 import stable_ssl.utils
 
+import sys
+import os
+
+# Add the parent folder to sys.path
+parent_dir = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, os.path.dirname(parent_dir))
 
 def patch_setup_distributed(args):
     """Set up the distributed environment for PyTorch."""

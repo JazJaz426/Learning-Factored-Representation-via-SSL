@@ -1,12 +1,19 @@
 """
 This script demonstrates how to train a model using the stable-SSL library.
 """
+import sys
+import os
+
+# Add the parent folder to sys.path
+parent_dir = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, os.path.dirname(parent_dir))
+
 
 import hydra
 from omegaconf import DictConfig
 
-from ssl_models.stable_ssl_patches import patch_stable_ssl
-from ssl_models.custom_config import get_args
+from models.ssl_models.stable_ssl_patches import patch_stable_ssl
+from models.ssl_models.custom_config import get_args
 
 from stable_ssl.joint_embedding import SimCLR, BarlowTwins
 from stable_ssl import Supervised
