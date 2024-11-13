@@ -66,7 +66,7 @@ class CovarianceFactorizationConfig(JointEmbeddingConfig):
 # MaskingFactorizationConfig
 """MaskingFactorization model which is a modification of BYOL model."""
 #
-# Author: Hugues Van Assel
+# Original Author: Hugues Van Assel
 #         Randall Balestriero
 #
 
