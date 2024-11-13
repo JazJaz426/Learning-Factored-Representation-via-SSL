@@ -208,10 +208,10 @@ class CustomEnvReset:
         splitIdx = all_factors['door_pos'][0]; doorIdx = all_factors['door_pos'][1]
         door_locked = all_factors['door_locked']
         door_open = all_factors['door_open']
-
+        logging.info("211")
         env.unwrapped.grid.vert_wall(splitIdx, 0)
         env.unwrapped.put_obj(Door("yellow", is_locked=door_locked, is_open=door_open), splitIdx, doorIdx)
-
+        logging.info("214")
         # factor 5: add key position and holding
         # factor 6: control holding key
         if all_factors['key_pos'] != (None, None):
@@ -220,14 +220,16 @@ class CustomEnvReset:
             env.unwrapped.place_obj(obj=Key("yellow"), top= key_top, size= key_size)
         
         else:
+            logging.info("223")
             env.unwrapped.carrying = Key("yellow")
+            logging.info("225")
 
         # factor 7, 8: add agent position and direction
         agent_top = all_factors['agent_pos']
         agent_size = (1,1)
         env.unwrapped.place_agent(top=agent_top, size=agent_size)
         env.unwrapped.agent_dir = all_factors['agent_dir']
-
+        logging.info("232")
         env.unwrapped.mission = "use the key to open the door and then get to the goal"
         
         #reset the original rng after resetting env

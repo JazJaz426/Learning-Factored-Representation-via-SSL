@@ -1,8 +1,0 @@
-README.md
-pyproject.toml
-setup.cfg
-ssl_setup.egg-info/PKG-INFO
-ssl_setup.egg-info/SOURCES.txt
-ssl_setup.egg-info/dependency_links.txt
-ssl_setup.egg-info/requires.txt
-ssl_setup.egg-info/top_level.txt

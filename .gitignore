@@ -12,3 +12,5 @@ __pycache__
 multirun/*
 multirun/*
 outputs/*
+
+ssl_setup.eeg-info
