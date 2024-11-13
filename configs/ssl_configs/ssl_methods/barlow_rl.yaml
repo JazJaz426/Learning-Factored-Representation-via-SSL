@@ -20,7 +20,8 @@ data:
   train_on: base
   base:
     name: CustomDataset
-    data_env_config: /users/vsharm44/projects/Learning-Factored-Representation-via-SSL/configs/data_generator/config.yaml
+    data_env_config: /users/ssunda11/Learning-Factored-Representation-via-SSL/configs/data_generator/config.yaml
+    max_count: 1000
     policy_model: null
     max_count: 1000
     model_path: null
@@ -80,10 +81,11 @@ data:
           p: 0.2
   test_out:
     name: CustomDataset
-    data_env_config: /users/vsharm44/projects/Learning-Factored-Representation-via-SSL/configs/data_generator/config.yaml
+    data_env_config: /users/ssunda11/Learning-Factored-Representation-via-SSL/configs/data_generator/config.yaml
     policy_model: null
     max_count: 1000
     model_path: null
+    max_count: 1000
     mode: cont
     # path: ${local_data_path.cifar10_path}
     batch_size: ${batch_size_across_gpus}

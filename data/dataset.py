@@ -80,7 +80,7 @@ class CustomDataset(Dataset):
             #get the current visual observation and underlying state
             obs = self.data_env.get_curr_obs()
             state = self.data_env._construct_state()
-
+            logging.info("after reset")
         elif self.mode == 'triplet':
             raise NotImplementedError(f'ERROR: data generation mode cannot be {self.mode}')
         else:
@@ -88,7 +88,7 @@ class CustomDataset(Dataset):
 
         self.count += 1
         state = [item for sublist in state.values() for item in (sublist if isinstance(sublist, tuple) else [sublist])]
-        
+
         logging.info("get info returned")
         return obs, state 
 
