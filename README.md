@@ -43,5 +43,5 @@ pip install -e .
 
 # run ssl training script
 ```bash
-python train.py --config-name=ssl_methods/barlow_cifar10_multigpu.yaml -m
+python train.py --config-name=ssl_methods/barlow_rl.yaml -m
 ```

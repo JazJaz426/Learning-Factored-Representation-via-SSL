@@ -1,7 +1,14 @@
+import sys
+import os
+
+# Add the parent folder to sys.path
+parent_dir = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, os.path.dirname(parent_dir))
 import torch
 from torch.utils.data import Dataset
-from data_generator import DataGenerator
+from .data_generator import DataGenerator
 import numpy as np
+import logging
 
 class CustomDataset(Dataset):
     def __init__(self, data_env_config, policy_model = None, model_path = None, mode = 'seq'):
@@ -9,6 +16,7 @@ class CustomDataset(Dataset):
         self.data_env = DataGenerator(data_env_config)
         self.count = 0
         self.mode = mode #options: seq [sequential], cont [controlled factors], triplet [triplet pair with different actions]
+        self.classes = list(range(1000))
 
         #policy model used for data generation: load from checkpoint path if needed
         if policy_model is not None:
@@ -17,9 +25,8 @@ class CustomDataset(Dataset):
         else:
             self.model = RandomPolicy(self.data_env)
 
-
     def __len__(self):
-        return self.count
+        return 1000 #self.count
 
     def sample_factors(self):
 
@@ -46,6 +53,7 @@ class CustomDataset(Dataset):
 
     def __getitem__(self, index):
 
+        logging.info("get info called")
         if self.mode == 'seq':
 
             #get the current visual observation and underlying state
@@ -59,8 +67,9 @@ class CustomDataset(Dataset):
         elif self.mode == 'cont':
 
             #NOTE: input controlled_factors as empty dictionary so that all factors are randomized following env rules
+            logging.info("factored_reset")
             self.data_env.env = self.data_env.custom_resetter.factored_reset(self.data_env.env, self.data_env.env.unwrapped.grid.height, self.data_env.env.unwrapped.grid.width, {})
-
+            logging.info("factored_reset")
             #get the current visual observation and underlying state
             obs = self.data_env.get_curr_obs()
             state = self._construct_state()
@@ -71,6 +80,7 @@ class CustomDataset(Dataset):
             raise NotImplementedError(f'ERROR: data generation mode cannot be {self.mode}')
 
         self.count += 1
+        logging.info("get info returned")
         return obs, state 
 
 

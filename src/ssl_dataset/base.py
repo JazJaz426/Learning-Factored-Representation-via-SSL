@@ -23,7 +23,7 @@ from dataclasses import dataclass
 from torchvision.transforms import v2
 from stable_ssl.data.augmentations import TransformConfig
 from data.dataset import CustomDataset
-
+from typing import Optional
 
 @dataclass
 class DisentangledAugmentation:
@@ -92,10 +92,10 @@ class DatasetConfig(base.DatasetConfig):
     """
 
     disentangle: DisentangledAugmentation = None
-    data_env_config: str = None
-    policy_model: str = None
-    model_path: str = None
-    mode: str = 'seq'
+    data_env_config: Optional[str] = None
+    policy_model: Optional[str] = None
+    model_path: Optional[str] = None
+    mode: Optional[str] = 'seq'
 
     def __post_init__(self):
         logging.info(

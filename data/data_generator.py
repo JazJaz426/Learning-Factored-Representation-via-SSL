@@ -6,7 +6,7 @@ from minigrid.minigrid_env import MiniGridEnv
 from minigrid.core.world_object import Door, Goal, Key
 from minigrid.wrappers import ImgObsWrapper
 from minigrid.wrappers import FullyObsWrapper
-from gymnasium.wrappers.time_limit import TimeLimit
+from gymnasium.wrappers import TimeLimit
 import yaml
 
 import gymnasium as gym
@@ -60,7 +60,10 @@ class DataGenerator(gym.Env):
         super(DataGenerator, self).__init__()
 
         # Parse yaml file parameters for data generator
-        configs = self.load_config(os.path.join(os.path.dirname(__file__), f'../configs/data_generator/{config_filename}'))
+        try:
+            configs = self.load_config(os.path.join(os.path.dirname(__file__), f'../configs/data_generator/{config_filename}'))
+        except:
+            configs = self.load_config(config_filename)
         
         # Configs from the yaml file
         self.observation_type = configs['observation_space']
