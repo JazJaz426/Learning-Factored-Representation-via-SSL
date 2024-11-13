@@ -93,10 +93,9 @@ class VecVideoRecorder(VecEnvWrapper):
     
     def step_wait(self) -> VecEnvStepReturn:
 
-        try:
-            obs, rewards, dones, infos = self.venv.step_wait()
-        except:
-            pdb.set_trace()
+        
+        obs, rewards, dones, infos = self.venv.step_wait()
+       
 
         self.step_id += 1
         if self.recording:
