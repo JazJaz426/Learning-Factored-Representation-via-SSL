@@ -69,7 +69,7 @@ class CustomDataset(Dataset):
             #NOTE: input controlled_factors as empty dictionary so that all factors are randomized following env rules
             logging.info("factored_reset")
             self.data_env.env = self.data_env.custom_resetter.factored_reset(self.data_env.env, self.data_env.env.unwrapped.grid.height, self.data_env.env.unwrapped.grid.width, {})
-            logging.info("factored_reset")
+            logging.info("factored_reset ended")
             #get the current visual observation and underlying state
             obs = self.data_env.get_curr_obs()
             state = self._construct_state()
