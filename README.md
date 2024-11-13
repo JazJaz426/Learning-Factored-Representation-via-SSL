@@ -33,3 +33,10 @@ evals \
   interpretability \
 tests \
   PyTorch_vision_tests \
+
+# SSL Setup
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -e .
+```

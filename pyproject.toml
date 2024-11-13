@@ -1,0 +1,18 @@
+[project]
+name = "ssl-setup"
+description = "SSL setup for the project"
+dependencies = [
+    "numpy",
+    "pandas",
+    "matplotlib",
+    "seaborn",
+    "torch",
+    "torchvision",
+    "tqdm",
+    "omegaconf",
+    "wandb",
+    "hydra-core",
+    "hydra-submitit-launcher",
+    "stable-ssl @ git+https://github.com/rbalestr-lab/stable-SSL.git@main#egg=stable-ssl"
+]
+dynamic = ["version"]
