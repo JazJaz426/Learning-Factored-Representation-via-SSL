@@ -119,7 +119,7 @@ class DataGenerator(gym.Env):
             
             self.gym_space_params = {'boolean': (0, 1, int), 'coordinate_width': (0, self.env.grid.width, int), 'coordinate_height': (0, self.env.grid.height, int), 'agent_dir': (0, 3, int)}
 
-            relevant_state_variables = list(self._construct_state().keys())
+            relevant_state_variables = sorted(self.state_attributes)
 
             min_values = np.array([]); max_values = np.array([])
 
@@ -178,7 +178,7 @@ class DataGenerator(gym.Env):
         
 
     
-        state = self._construct_state()
+        state, norm_state_array = self._construct_state()
 
 
 
@@ -202,10 +202,10 @@ class DataGenerator(gym.Env):
         #reward = 1 - ((abs(state['agent_pos'][0]-state['goal_pos'][0])+abs(state['agent_pos'][1]-state['goal_pos'][1]))/(self.env.unwrapped.height + self.env.unwrapped.width))
 
 
-        state = [item for sublist in state.values() for item in (sublist if isinstance(sublist, tuple) else [sublist])] 
+        
 
 
-        observation = self._get_obs(image = frame, state = state, factored = factored)
+        observation = self._get_obs(image = frame, state = norm_state_array, factored = factored)
         
 
        
@@ -241,7 +241,7 @@ class DataGenerator(gym.Env):
         #apply image transformations if needed
         frame = self.data_augmentor.apply_transformation(frame)
         
-        state = self._construct_state()
+        state, norm_state_array = self._construct_state()
         
         factored = None
 
@@ -253,10 +253,10 @@ class DataGenerator(gym.Env):
         #add the state in dictionary form for info
         info['state_dict'] = state
 
-        state = [item for sublist in state.values() for item in (sublist if isinstance(sublist, tuple) else [sublist])] 
+       
 
         
-        observation = self._get_obs(image = frame, state = state, factored = factored)
+        observation = self._get_obs(image = frame, state = norm_state_array, factored = factored)
 
         
         
@@ -266,8 +266,8 @@ class DataGenerator(gym.Env):
     def get_curr_obs(self):
 
         image = self.env.unwrapped.get_frame(tile_size=8)
-        state = self._construct_state()
-        state = [item for sublist in state.values() for item in (sublist if isinstance(sublist, tuple) else [sublist])] 
+        state, norm_state_array = self._construct_state()
+        
 
         factored = None
 
@@ -275,7 +275,7 @@ class DataGenerator(gym.Env):
             factored = self._factorize_obs(frame)
 
 
-        obs = self._get_obs(image= image, state= state, factored= factored)
+        obs = self._get_obs(image= image, state= norm_state_array, factored= factored)
 
         return obs
 
@@ -294,7 +294,7 @@ class DataGenerator(gym.Env):
         #extract the types of all tiles in the grid: useful for goal, key and door position
         types = np.array([x.type if x is not None else None for x in self.env.unwrapped.grid.grid])
 
-        for attr in self.state_attributes:
+        for attr in sorted(self.state_attributes):
 
             if hasattr(self.env.unwrapped, attr):
                 state[attr] = getattr(self.env.unwrapped,attr)
@@ -320,10 +320,16 @@ class DataGenerator(gym.Env):
             elif ('door' in types) and (attr == 'door_open'):
                 state[attr] = int(self.env.unwrapped.grid.grid[np.where(types=='door')[0][0]].is_open)
 
+
+        norm_state_array = np.array([item for key in sorted(state.keys()) for item in (state[key] if isinstance(state[key], tuple) else [state[key]])])
+
+        min_values = np.array(self.observation_space.low)
+        max_values = np.array(self.observation_space.high)
         
+        #construct normalized state array output
+        norm_state_array = list((norm_state_array - min_values) / (max_values - min_values))
 
-
-        return state
+        return state, norm_state_array
         
 
     def _get_obs(self, image=None, state=None, factored=None):
@@ -346,7 +352,7 @@ if __name__ == '__main__':
     pdb.set_trace()
 
     data_generator = DataGenerator()
-    data_gen_test = DataGenerator(config_filename='config_test.yaml')
+    data_gen_test = DataGenerator(config_filename='config.yaml')
     
     obs, info = data_generator.reset()
     obs_t, info_t = data_gen_test.reset()

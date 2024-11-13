@@ -2,7 +2,7 @@ policy_head:
   algorithm: "PPO"  # Options: DQN, PPO, A2C
   num_models: 3
   num_parallel_envs: 4 #NOTE: log freqs have to be divisible by num_parallel_envs 
-  train_interval: 5000000
+  train_interval: 10000000
   num_eval_eps: 10
   verbose: true
   video_length: 200
