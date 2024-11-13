@@ -6,10 +6,11 @@ parent_dir = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.dirname(parent_dir))
 import torch
 from torch.utils.data import Dataset
-from .data_generator import DataGenerator
+from data_generator import DataGenerator
 import numpy as np
 import logging
 import pdb
+from PIL import Image
 
 class CustomDataset(Dataset):
     def __init__(self, data_env_config, max_count, policy_model = None, model_path = None, mode = 'seq'):
@@ -103,7 +104,8 @@ if __name__ == "__main__":
 
     dataset = CustomDataset('configs/data_generator/config.yaml', max_count=100, mode='cont')
 
-    pdb.set_trace()
+    #pdb.set_trace()
 
-    for d in dataset:
-        print(d)
+    for i, d in enumerate(dataset):
+        print(i, d[0].shape)
+        Image.fromarray(d[0]).save(f'data/train_data/{i}.png')
