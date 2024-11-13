@@ -17,7 +17,7 @@ model_dict = {
 }
 
 
-@hydra.main(config_path="configs/")
+@hydra.main(config_path="configs/ssl_configs/")
 def main(cfg: DictConfig):
     changed = patch_stable_ssl()
     print(f"Applied {len(changed)} patches to stable-ssl!")
