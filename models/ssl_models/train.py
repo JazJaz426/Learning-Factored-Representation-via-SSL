@@ -8,10 +8,11 @@ from omegaconf import DictConfig
 from ssl_models.stable_ssl_patches import patch_stable_ssl
 from ssl_models.custom_config import get_args
 
-from stable_ssl.joint_embedding import SimCLR
+from stable_ssl.joint_embedding import SimCLR, BarlowTwins
 from stable_ssl import Supervised
 
 model_dict = {
+    "BarlowTwins": BarlowTwins,
     "SimCLR": SimCLR,
     "Supervised": Supervised,
 }
