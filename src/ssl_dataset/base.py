@@ -22,7 +22,7 @@ import numpy as np
 from dataclasses import dataclass
 from torchvision.transforms import v2
 from stable_ssl.data.augmentations import TransformConfig
-
+from data.dataset import CustomDataset
 
 
 @dataclass
@@ -92,6 +92,10 @@ class DatasetConfig(base.DatasetConfig):
     """
 
     disentangle: DisentangledAugmentation = None
+    data_env_config: str = None
+    policy_model: str = None
+    model_path: str = None
+    mode: str = 'seq'
 
     def __post_init__(self):
         logging.info(
@@ -119,19 +123,24 @@ class DatasetConfig(base.DatasetConfig):
                 dataset = torchvision.datasets.ImageNet(
                     root=self.data_path,
                     split=self.split,
+                    transforms=Sampler(self.transforms),
                 )
             else:
                 dataset = getattr(torchvision.datasets, self.name)(
                     root=self.data_path,
                     train=self.split == "train",
                     download=True,
+                    transforms=Sampler(self.transforms),
                 )
         else:
-            dataset = torchvision.datasets.ImageFolder(
-                root=os.path.join(self.path),
+            dataset = CustomDataset(
+                data_env_config = self.data_env_config,
+                policy_model = self.policy_model,
+                model_path = self.model_path,
+                mode = self.mode,
             )
-        # transforms need to be passed to frozen noise dataset and for that to happen we need to override get_dataset
-        dataset = FrozenNoiseDataset(dataset, self.disentangle, transforms=Sampler(self.transforms))
+        # if we use disentalgled augmentation, we need to wrap the dataset
+        # dataset = FrozenNoiseDataset(dataset, self.disentangle, transforms=Sampler(self.transforms))
         return dataset
 
 

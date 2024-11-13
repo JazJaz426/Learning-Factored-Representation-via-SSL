@@ -19,8 +19,12 @@ batch_size_across_gpus: 256
 data:
   train_on: base
   base:
-    name: CIFAR10
-    path: ${local_data_path.cifar10_path}
+    name: CustomDataset
+    data_env_config: null
+    policy_model: null
+    model_path: null
+    mode: seq
+    # path: ${local_data_path.cifar10_path}
     batch_size: ${batch_size_across_gpus}
     drop_last: True
     shuffle: True
@@ -74,8 +78,12 @@ data:
           threshold: 128
           p: 0.2
   test_out:
-    name: CIFAR10
-    path: ${local_data_path.cifar10_path}
+    name: CustomDataset
+    data_env_config: MiniGrid-DoorKey-8x8-v0
+    policy_model: null
+    model_path: null
+    mode: seq
+    # path: ${local_data_path.cifar10_path}
     batch_size: ${batch_size_across_gpus}
     drop_last: False
     num_workers: -1
