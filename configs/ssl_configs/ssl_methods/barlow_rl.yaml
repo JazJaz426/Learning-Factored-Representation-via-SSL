@@ -22,6 +22,7 @@ data:
     name: CustomDataset
     data_env_config: /users/vsharm44/projects/Learning-Factored-Representation-via-SSL/configs/data_generator/config.yaml
     policy_model: null
+    max_count: 1000
     model_path: null
     mode: cont
     # path: ${local_data_path.cifar10_path}
@@ -81,6 +82,7 @@ data:
     name: CustomDataset
     data_env_config: /users/vsharm44/projects/Learning-Factored-Representation-via-SSL/configs/data_generator/config.yaml
     policy_model: null
+    max_count: 1000
     model_path: null
     mode: cont
     # path: ${local_data_path.cifar10_path}

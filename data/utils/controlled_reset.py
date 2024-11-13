@@ -6,6 +6,7 @@ import pdb
 import copy
 import numpy as np
 import random as random
+import logging
 
 class CustomEnvReset:
 
@@ -72,6 +73,7 @@ class CustomEnvReset:
     def _custom_reset_doorkey(self, env, width, height, controlled_factors={}):
         
         #change the random seed locally 
+        logging.info("76")
         curr_rng = env.unwrapped.np_random
         local_rng = np.random.default_rng(int(100*random.random()))
         env.unwrapped.np_random = local_rng
@@ -115,7 +117,7 @@ class CustomEnvReset:
 
             all_factors[f] = factor
         
-
+        logging.info("120")
         #randomly set the factor values for all other factors: sample until they are not in used locations
         remaining_factors = list(sorted(self.all_factors - set(list(controlled_factors.keys()))))
 
@@ -134,7 +136,7 @@ class CustomEnvReset:
             if f == 'door_pos':
 
                 rand_door_loc = (0,0)
-
+                logging.info("139")
                 while (rand_door_loc in used_locations) and (isinstance(env.unwrapped.grid.get(rand_door_loc[0], rand_door_loc[1]), Wall)):
                     
                     rand_door_loc = (env.unwrapped._rand_int(2, width - 2), env.unwrapped._rand_int(1, height - 2))
@@ -151,7 +153,7 @@ class CustomEnvReset:
             
             if f == 'agent_pos':
                 rand_agent_loc = (0,0)
-
+                logging.info("156")
                 while (rand_agent_loc in used_locations) and (isinstance(env.unwrapped.grid.get(rand_agent_loc[0], rand_agent_loc[1]), Wall)):
                     
                     rand_agent_loc = (env.unwrapped._rand_int(1, width - 1), env.unwrapped._rand_int(1, height - 1))
@@ -174,7 +176,7 @@ class CustomEnvReset:
                 #set key location anywhere if not holding and door open
                 if not all_factors['holding_key'] and all_factors['door_open']:
                     rand_key_loc = (0,0)
-
+                    logging.info("179")
                     while (rand_key_loc  in used_locations) and isinstance(env.unwrapped.grid.get(rand_key_loc[0], rand_key_loc[1]), Wall):
                         
                         rand_key_loc = (env.unwrapped._rand_int(1, width - 1), env.unwrapped._rand_int(1, height - 1))
@@ -186,7 +188,7 @@ class CustomEnvReset:
                     #align key position so that it is on the same side of the door as the agent is
                     min_col = 1 if all_factors['agent_pos'][0] < all_factors['door_pos'][0] else all_factors['door_pos'][0] + 1
                     max_col = all_factors['door_pos'][0] - 1 if all_factors['agent_pos'][0] < all_factors['door_pos'][0] else width-1
-
+                    logging.info("191")
                     while (rand_key_loc  in used_locations) and isinstance(env.unwrapped.grid.get(rand_key_loc[0], rand_key_loc[1]), Wall):
                         
                         rand_key_loc = (env.unwrapped._rand_int(min_col, max_col), env.unwrapped._rand_int(1, height - 1))
@@ -198,7 +200,7 @@ class CustomEnvReset:
                 
                 all_factors[f] = rand_key_loc
         
-
+        logging.info("203")
         # factor 1: add goal position 
         env.unwrapped.put_obj(Goal(), all_factors['goal_pos'][0], all_factors['goal_pos'][1])
         
@@ -230,7 +232,7 @@ class CustomEnvReset:
         
         #reset the original rng after resetting env
         env.unwrapped.np_random = curr_rng
-
+        logging.info("235")
         return env
 
     def _custom_reset_empty(self, env, width, height, controlled_factors={}):

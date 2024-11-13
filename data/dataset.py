@@ -6,7 +6,7 @@ parent_dir = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.dirname(parent_dir))
 import torch
 from torch.utils.data import Dataset
-from data_generator import DataGenerator
+from .data_generator import DataGenerator
 import numpy as np
 import logging
 import pdb
@@ -55,6 +55,7 @@ class CustomDataset(Dataset):
 
     def __getitem__(self, index):
 
+        logging.info("inside get item")
         if self.mode == 'seq':
 
             #get the current visual observation and underlying state
@@ -66,10 +67,10 @@ class CustomDataset(Dataset):
             self.data_env.step(actions)
 
         elif self.mode == 'cont':
-
+            logging.info("before reset")
             #NOTE: input controlled_factors as empty dictionary so that all factors are randomized following env rules
             self.data_env.env = self.data_env.custom_resetter.factored_reset(self.data_env.env, self.data_env.env.unwrapped.grid.height, self.data_env.env.unwrapped.grid.width, {})
-
+            logging.info("after reset")
             #get the current visual observation and underlying state
             obs = self.data_env.get_curr_obs()
             state = self.data_env._construct_state()
