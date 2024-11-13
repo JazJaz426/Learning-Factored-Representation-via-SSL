@@ -9,7 +9,7 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../..')
 from data.data_generator import DataGenerator
 import pdb
 from stable_baselines3.common.callbacks import CallbackList, CheckpointCallback
-from stable_baselines3.common.vec_env import VecVideoRecorder
+from stable_baselines3.common.vec_env import VecVideoRecorder, VecNormalize
 import imageio
 from torch.utils.tensorboard import SummaryWriter
 import gymnasium as gym
@@ -39,8 +39,9 @@ class PolicyHead:
 
         print('POLICY NAME: ', self.policy_name)
         
+
         self.parallel_train_env = VecVideoRecorder(
-            self.create_parallel_envs(seed = self.seed), 
+            VecNormalize(self.create_parallel_envs(seed = self.seed), training=True, norm_obs=True, norm_reward=False, clip_obs=np.inf), 
             f"./logs/{self.algorithm}_{self.data_config['environment_name']}_policyviz/{self.data_config['observation_space']}/seed_{self.seed}/", 
             record_video_trigger=lambda x: x % (self.model_config['video_log_freq'] // self.model_config['num_parallel_envs']) == 0, 
             video_length=self.model_config['video_length'], 
