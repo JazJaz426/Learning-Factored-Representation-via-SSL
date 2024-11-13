@@ -9,7 +9,6 @@ sbatch_out/
 __pycache__
 
 .venv
-<<<<<<< HEAD
-=======
 multirun/*
->>>>>>> 75af004 (logging file and gitignore change)
+multirun/*
+outputs/*

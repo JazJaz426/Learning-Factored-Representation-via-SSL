@@ -37,7 +37,7 @@ from src.ssl_dataset.base import DataConfig
 _MODEL_CONFIGS = {
     "Supervised": ModelConfig,
     "SimCLR": SimCLRConfig,
-    "Barlowtwins": BarlowTwinsConfig,
+    "BarlowTwins": BarlowTwinsConfig,
     "VICReg": VICRegConfig,
     "WMSE": WMSEConfig,
 }
@@ -92,15 +92,6 @@ def get_args(cfg_dict, model_class=None):
         if name not in ["data", "optim", "model", "hardware", "log"]
     }
 
-    logging.info(
-        f"Using {kwargs.get('corruption_type', None)} corruptions."
-    )
-    logging.info(
-        f"Using {kwargs.get('data_noise', None)},"
-        f"{kwargs.get('augmentation_noise', None)} "
-        "for data,augmentation corruptions."
-    )
-
     model = cfg_dict.get("model", {})
     if model_class is None:
         name = model.get("name", None)
@@ -113,9 +104,6 @@ def get_args(cfg_dict, model_class=None):
     log_config = cfg_dict.get("log", {})
     log_api = log_config.get("api", None)
     log = _LOG_CONFIGS[log_api.lower() if log_api else None](**log_config)
-
-    cfg_dict.get("data", {})["dataset_type"] = \
-        cfg_dict.get("data", {}).get("dataset_type", "TorchvisionDataset")
 
     args = GlobalConfig(
         model=model,

@@ -91,7 +91,6 @@ class DatasetConfig(base.DatasetConfig):
         List of corruptions to apply deterministically to the data.
     """
 
-    dataset_type: str = "TorchvisionDataset"
     disentangle: DisentangledAugmentation = None
 
     def __post_init__(self):
@@ -148,15 +147,10 @@ class DataConfig(base.DataConfig):
         Use CorruptedTorchvisionDataset to support noise in CIFAR and ImageNet.
     """
 
-    dataset_type: str
-
-    def __init__(self, train_on, dataset_type, *args, **datasets):
+    def __init__(self, train_on, *args, **datasets):
         assert len(args) == 0
         self.train_on = train_on
-        self.dataset_type = dataset_type
 
         self.datasets = {}
         for name, d in datasets.items():
-            self.datasets[name] = DatasetConfig(
-                dataset_type=self.dataset_type,
-                **d)
+            self.datasets[name] = DatasetConfig(**d)
