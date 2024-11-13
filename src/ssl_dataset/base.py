@@ -124,14 +124,14 @@ class DatasetConfig(base.DatasetConfig):
                 dataset = torchvision.datasets.ImageNet(
                     root=self.data_path,
                     split=self.split,
-                    transforms=Sampler(self.transforms),
+                    transform=Sampler(self.transforms),
                 )
             else:
                 dataset = getattr(torchvision.datasets, self.name)(
                     root=self.data_path,
                     train=self.split == "train",
                     download=True,
-                    transforms=Sampler(self.transforms),
+                    transform=Sampler(self.transforms),
                 )
         else:
             dataset = CustomDataset(
