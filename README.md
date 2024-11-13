@@ -40,3 +40,8 @@ python3 -m venv .venv
 source .venv/bin/activate
 pip install -e .
 ```
+
+# run ssl training script
+```bash
+python models/ssl_models/train.py --config-name=ssl_methods/barlow_cifar10_multigpu.yaml ++/user@_global_: vipul/run_slurm
+```
