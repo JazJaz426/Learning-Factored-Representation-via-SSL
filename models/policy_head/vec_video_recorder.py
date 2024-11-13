@@ -92,7 +92,10 @@ class VecVideoRecorder(VecEnvWrapper):
         return self.record_video_trigger(self.step_id)
     
     def step_wait(self) -> VecEnvStepReturn:
+
+        
         obs, rewards, dones, infos = self.venv.step_wait()
+       
 
         self.step_id += 1
         if self.recording:

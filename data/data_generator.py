@@ -3,6 +3,7 @@
 # from gym_minigrid.wrappers import ImgObsWrapper
 
 from minigrid.minigrid_env import MiniGridEnv
+from minigrid.core.world_object import Door, Goal, Key
 from minigrid.wrappers import ImgObsWrapper
 from minigrid.wrappers import FullyObsWrapper
 from gymnasium.wrappers.time_limit import TimeLimit
@@ -172,6 +173,9 @@ class DataGenerator(gym.Env):
 
     
         state = self._construct_state()
+
+
+
         factored = None
 
         if self.observation_type == 'factored':
@@ -232,6 +236,7 @@ class DataGenerator(gym.Env):
         frame = self.data_augmentor.apply_transformation(frame)
         
         state = self._construct_state()
+        
         factored = None
 
         if self.observation_type == 'factored':
@@ -252,7 +257,21 @@ class DataGenerator(gym.Env):
         return observation, info
     
 
+    def get_curr_obs(self):
 
+        image = self.env.unwrapped.get_frame(tile_size=8)
+        state = self._construct_state()
+        state = [item for sublist in state.values() for item in (sublist if isinstance(sublist, tuple) else [sublist])] 
+
+        factored = None
+
+        if self.observation_type == 'factored':
+            factored = self._factorize_obs(frame)
+
+
+        obs = self._get_obs(image= image, state= state, factored= factored)
+
+        return obs
 
         
             
@@ -274,24 +293,30 @@ class DataGenerator(gym.Env):
             if hasattr(self.env.unwrapped, attr):
                 state[attr] = getattr(self.env.unwrapped,attr)
             elif attr == 'goal_pos':
-                state[attr] = self.env.unwrapped.grid.grid[np.where(types=='goal')[0][0]].cur_pos
+                state[attr] = tuple(self.env.unwrapped.grid.grid[np.where(types=='goal')[0][0]].cur_pos)
             
             #other positional attributes for key and door
             elif ('key' in types) and (attr == 'key_pos'):
-                state[attr] = self.env.unwrapped.grid.grid[np.where(types=='key')[0][0]].cur_pos
+                state[attr] = tuple(self.env.unwrapped.grid.grid[np.where(types=='key')[0][0]].cur_pos)
+                
+            elif ('key' not in types) and (attr == 'key_pos'):
+                state['key_pos'] = tuple(state['agent_pos'])
+
             elif ('door' in types) and (attr == 'door_pos'):
-                state[attr] = self.env.unwrapped.grid.grid[np.where(types=='door')[0][0]].cur_pos
+                state[attr] = tuple(self.env.unwrapped.grid.grid[np.where(types=='door')[0][0]].cur_pos)
             
 
             #other attributes like opening, holding, locked etc...
-            elif ('key' in types) and (attr == 'holding_key'):
-                state[attr] = int(not self.env.unwrapped.grid.grid[np.where(types=='key')[0][0]].can_pickup())
+            elif (attr == 'holding_key'):
+                state[attr] = int(isinstance(self.env.unwrapped.carrying, Key))
             elif ('door' in types) and (attr == 'door_locked'):
                 state[attr] = int(self.env.unwrapped.grid.grid[np.where(types=='door')[0][0]].is_locked)
             elif ('door' in types) and (attr == 'door_open'):
                 state[attr] = int(self.env.unwrapped.grid.grid[np.where(types=='door')[0][0]].is_open)
 
         
+
+
         return state
         
 

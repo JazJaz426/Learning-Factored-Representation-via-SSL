@@ -37,7 +37,6 @@ class CustomVideoRecorder(VecVideoRecorder):
  
     def step_wait(self) -> VecEnvStepReturn:
         
-        print('Video Recorder: ', self.step_id)
         
         obs, rewards, dones, infos = self.env.step_wait()
 
@@ -225,7 +224,7 @@ class ValuePlottingCallback(BaseCallback):
    
     def _plot_value_func(self):
         '''extract the value function for a particular observation'''
-        print('Value Function: ', self.num_timesteps)
+        
         original_obs, info = self.base_env.reset()
 
         value_function = np.zeros((self.base_env.env.env.unwrapped.width, self.base_env.env.env.unwrapped.height)) * np.nan
@@ -246,9 +245,8 @@ class ValuePlottingCallback(BaseCallback):
                     for dir in range(4):
                         
                         self.base_env.env.env.unwrapped.agent_dir = dir
-                        obs = self.base_env.env.env.unwrapped.get_frame(tile_size=8)
 
-                       
+                        obs = self.base_env.get_curr_obs()
                         
                         obs_tensor, vector_env = self.model.policy.obs_to_tensor(obs)
 
@@ -267,7 +265,7 @@ class ValuePlottingCallback(BaseCallback):
 
         #plotting value function over the observation
         fig = plt.figure(frameon=False)
-        plt.imshow(original_obs)
+        plt.imshow(info['obs'])
         plot_extent = [0, self.base_env.env.env.unwrapped.width * 8, self.base_env.env.env.unwrapped.height * 8, 0]
         plt.imshow(value_function, alpha=0.5, cmap='viridis', extent = plot_extent)
         plt.colorbar()
