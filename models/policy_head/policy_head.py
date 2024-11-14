@@ -47,7 +47,7 @@ class PolicyHead:
             self.log_path = f"./logs/{self.algorithm}_{self.data_config['environment_name']}"
         print("log path:", self.log_path)
         self.parallel_train_env = VecVideoRecorder(
-            VecNormalize(self.create_parallel_envs(seed = self.seed), training=True, norm_obs=True, norm_reward=False, clip_obs=np.inf), 
+            self.create_parallel_envs(seed = self.seed), 
             f"{self.log_path}/policyviz/{self.data_config['observation_space']}/seed_{self.seed}/", 
             record_video_trigger=lambda x: x % (self.model_config['video_log_freq'] // self.model_config['num_parallel_envs']) == 0, 
             video_length=self.model_config['video_length'], 

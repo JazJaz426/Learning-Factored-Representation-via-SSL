@@ -6,3 +6,11 @@ __pycache__
 logs/
 wandb/
 sbatch_out/
+__pycache__
+
+.venv
+multirun/*
+multirun/*
+outputs/*
+
+ssl_setup.eeg-info
