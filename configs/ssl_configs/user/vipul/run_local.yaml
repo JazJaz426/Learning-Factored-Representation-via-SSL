@@ -1,0 +1,4 @@
+defaults:
+  - /user/vipul@local_data_path: data_paths
+  - /user/vipul@_global_: logging
+  - override /hydra/launcher: submitit_local

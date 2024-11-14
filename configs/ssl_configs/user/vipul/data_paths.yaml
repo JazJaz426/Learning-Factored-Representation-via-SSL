@@ -1,0 +1,4 @@
+cifar10_path: ~/scratch/data/CIFAR10
+cifar100_path: ~/scratch/data/CIFAR100
+train_imagenet_path: /jobtmp/vsharm44/ImageNet/train
+val_imagenet_path: /jobtmp/vsharm44/ImageNet/val
