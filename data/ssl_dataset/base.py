@@ -5,76 +5,65 @@ import os
 parent_dir = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.dirname(parent_dir))
 
-from dataclasses import dataclass
 import logging
 
-import os
 import torchvision
 from stable_ssl.data.augmentations import TransformsConfig
 from stable_ssl.data import base
 from stable_ssl.data.base import Sampler
 from torch.utils.data import Dataset
-from hydra.utils import get_original_cwd
-import time
-import copy
-from hydra.core.hydra_config import HydraConfig
-import numpy as np
 from dataclasses import dataclass
-from torchvision.transforms import v2
-from stable_ssl.data.augmentations import TransformConfig
 from data.dataset import CustomDataset
 from typing import Optional
 
-@dataclass
-class DisentangledAugmentation:
-    """Configuration for the noise to be added to training data.
 
-    Parameters
-    ----------
-    disentagle : list[tuple[str, dict]]
-        The disentaglement/transformations to apply. For example:
-        ```
-        "AlterOneFactor":{"p":0.5}
-        ```
-    """
-
-    disentagle: list[dict] = None
-
-    def __post_init__(self):
-        """Initialize the corruptions configuration."""
-        if self.disentagle is None:
-            self.disentagle = [{}]
-            self._disentagle = v2.Compose([v2.Identity()])
-        else:
-            self._disentagle = v2.Compose(
-                [TransformConfig(**t) for t in self.disentagle]
-            )
-
-    def __call__(self, x):
-        return self._disentagle(x)
-
-
-class FrozenNoiseDataset(Dataset):
-    def __init__(self, dataset, disentangle_transform=None, transforms=None):
+class GridworldDataset(Dataset):
+    def __init__(self, dataset, mode=None, transforms=None):
         self.dataset = dataset
-        self.disentangle_transform = disentangle_transform
+        self.mode = mode
         self.transforms = transforms
         self.classes = dataset.classes
-        self.class_to_idx = dataset.class_to_idx
+        # self.class_to_idx = dataset.class_to_idx
 
     def __len__(self):
         return len(self.dataset)
 
     def __getitem__(self, idx):
-        x, y = self.dataset[idx]
+        if self.mode=='seq':
+            """
+                item_dict["previous_obs"] = obs_pre
+                item_dict["current_obs"] = obs_post
+                item_dict["previous_state"] = state_pre
+                item_dict["current_state"] = state_post
+                item_dict["previous_norm_state"] = norm_state_pre
+                item_dict["current_norm_state"] = norm_state_post
+                item_dict["action"] = action
+            """
+            item_dict = self.dataset[idx]
+            if self.transforms is not None:
+                assert len(self.transforms) == 2
+                item_dict["previous_obs"] = Sampler(self.transforms[0])(item_dict["previous_obs"])
+                item_dict["current_obs"] = Sampler(self.transforms[1])(item_dict["current_obs"])
+            x = [item_dict["previous_obs"], item_dict["current_obs"]]
+            y = item_dict["previous_norm_state"]
+            z = item_dict["action"]
+        elif self.mode in ['cont', 'rand']:
+            """
+                item_dict["previous_obs"] = obs
+                item_dict["previous_state"] = state
+                item_dict["previous_norm_state"] = norm_state
+                item_dict["action"] = action
+            """
+            item_dict = self.dataset[idx]
+            x = item_dict["previous_obs"]
+            y = item_dict["previous_norm_state"]
+            z = item_dict["action"]
+            if self.transforms is not None:
+                x = Sampler(self.transforms)(x)  # 1 z gets 2 or more positive views
+        else:
+            NotImplementedError(f"{self.mode} not implemented since not implemented in the dataset generator.")
 
-        if self.transforms is not None:
-            x = self.transforms(x)  # this will be more than 1 positive view returned
-
-        if self.disentangle_transform is not None:
-            x = [self.disentangle_transform(i) for i in x]  # this will need to work on more than one input samples
-
-        return x, y
+        return x, y, z
 
 
 @dataclass
@@ -91,7 +80,6 @@ class DatasetConfig(base.DatasetConfig):
         List of corruptions to apply deterministically to the data.
     """
 
-    disentangle: DisentangledAugmentation = None
     data_env_config: Optional[str] = None
     limit: Optional[int] = 1000
     policy_model: Optional[str] = None
@@ -109,10 +97,6 @@ class DatasetConfig(base.DatasetConfig):
                 TransformsConfig(name, t)
                 for name, t in self.transforms.items()
             ]
-        logging.info(
-                f"Using {self.disentangle} for compositional disentanglement."
-            )
-        self.disentangle = DisentangledAugmentation(self.disentangle)
 
     def get_dataset(self):
         """
@@ -141,8 +125,13 @@ class DatasetConfig(base.DatasetConfig):
                 model_path = self.model_path,
                 mode = self.mode,
             )
-        # if we use disentalgled augmentation, we need to wrap the dataset
-        # dataset = FrozenNoiseDataset(dataset, self.disentangle, transforms=Sampler(self.transforms))
+            # wrapping the dataset to only create a data, label pair from the RL dataset generator.
+            dataset = GridworldDataset(
+                dataset=dataset,
+                mode=self.mode,
+                transforms=self.transforms,
+            )
+
         return dataset
 
 

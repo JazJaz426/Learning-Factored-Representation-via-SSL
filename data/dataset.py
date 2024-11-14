@@ -73,7 +73,6 @@ class CustomDataset(Dataset):
         if index >= self.limit:
             raise IndexError("Index out of range")
 
-        item_dict = {}
         if self.mode == 'seq':
             #get the current visual observation and underlying state
             obs_pre = self.data_env.get_curr_obs()
@@ -89,6 +88,7 @@ class CustomDataset(Dataset):
             
             # NOTE: only for sequential data generation, use the policy to output a
             # (obs_pre, obs_post), (state_pre, state_post), (norm_state_pre, norm_state_post), action
+            item_dict = {}
             item_dict["previous_obs"] = obs_pre
             item_dict["current_obs"] = obs_post
             item_dict["previous_state"] = state_pre
@@ -96,6 +96,8 @@ class CustomDataset(Dataset):
             item_dict["previous_norm_state"] = norm_state_pre
             item_dict["current_norm_state"] = norm_state_post
             item_dict["action"] = action
+            for key in item_dict.keys():
+                assert item_dict[key] is not None, f"{key} is None in dataset."
             return item_dict
         elif self.mode == 'cont':
             #NOTE: input controlled_factors as empty dictionary so that all factors are randomized following env rules
@@ -119,10 +121,13 @@ class CustomDataset(Dataset):
             action = self.data_env.action_space.sample()
         assert action is not None, "Data loader batch collator in torch requires dtypes to be not None"
 
+        item_dict = {}
         item_dict["previous_obs"] = obs
         item_dict["previous_state"] = state
         item_dict["previous_norm_state"] = norm_state
         item_dict["action"] = action
+        for key in item_dict.keys():
+            assert item_dict[key] is not None, f"{key} is None in dataset."
         return item_dict
 
 
