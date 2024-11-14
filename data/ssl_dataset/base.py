@@ -97,7 +97,6 @@ class DatasetConfig(base.DatasetConfig):
     policy_model: Optional[str] = None
     model_path: Optional[str] = None
     mode: Optional[str] = 'seq'
-    max_count: int = 1000
 
     def __post_init__(self):
         logging.info(
@@ -141,7 +140,6 @@ class DatasetConfig(base.DatasetConfig):
                 policy_model = self.policy_model,
                 model_path = self.model_path,
                 mode = self.mode,
-                max_count = self.max_count,
             )
         # if we use disentalgled augmentation, we need to wrap the dataset
         # dataset = FrozenNoiseDataset(dataset, self.disentangle, transforms=Sampler(self.transforms))
