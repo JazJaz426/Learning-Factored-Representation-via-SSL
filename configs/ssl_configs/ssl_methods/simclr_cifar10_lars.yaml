@@ -2,7 +2,7 @@
 
 defaults:
   - _self_
-  - /user@_global_: vipul/run_slurm
+  - /user@_global_: vsharm44/run_slurm
 
 hydra:
   launcher:

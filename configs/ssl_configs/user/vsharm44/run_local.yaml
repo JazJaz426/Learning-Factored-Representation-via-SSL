@@ -1,0 +1,4 @@
+defaults:
+  - /user/vsharm44@local_data_path: data_paths
+  - /user/vsharm44@_global_: logging
+  - override /hydra/launcher: submitit_local

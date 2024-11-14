@@ -2,7 +2,7 @@
 
 defaults:
   - _self_
-  - /user@_global_: vipul/run_slurm
+  - /user@_global_: vsharm44/run_slurm
 
 hydra:
   launcher:
@@ -20,8 +20,8 @@ data:
   train_on: base
   base:
     name: CustomDataset
-    data_env_config: /users/ssunda11/Learning-Factored-Representation-via-SSL/configs/data_generator/config.yaml
-    max_count: 1000
+    data_env_config: ${local_data_path.data_env_config}
+    limit: 50000
     policy_model: null
     max_count: 1000
     model_path: null
@@ -81,11 +81,11 @@ data:
           p: 0.2
   test_out:
     name: CustomDataset
-    data_env_config: /users/ssunda11/Learning-Factored-Representation-via-SSL/configs/data_generator/config.yaml
+    data_env_config: ${local_data_path.data_env_config}
     policy_model: null
     max_count: 1000
     model_path: null
-    max_count: 1000
+    limit: 10000
     mode: cont
     # path: ${local_data_path.cifar10_path}
     batch_size: ${batch_size_across_gpus}
