@@ -18,12 +18,12 @@ import pdb
 from PIL import Image
 
 class CustomDataset(Dataset):
-    def __init__(self, data_env_config, max_count, policy_model = None, model_path = None, mode = 'seq'):
+    def __init__(self, data_env_config, limit, policy_model = None, model_path = None, mode = 'seq'):
         
         self.data_env = DataGenerator(data_env_config)
         self.count = 0
-        self.max_count = max_count
-        self.mode = mode #options: seq [sequential], cont [controlled factors], triplet [triplet pair with different actions]
+        self.limit = limit
+        self.mode = mode #options: seq [sequential], cont [controlled factors], triplet [triplet pair with different actions], rand [random reset, inbuilt]
         self.classes = list(range(1000))
 
         #policy model used for data generation: load from checkpoint path if needed
@@ -34,7 +34,7 @@ class CustomDataset(Dataset):
             self.model = RandomPolicy(self.data_env)
 
     def __len__(self):
-        return self.max_count
+        return self.limit
 
     def sample_factors(self):
 
@@ -61,7 +61,9 @@ class CustomDataset(Dataset):
 
     def __getitem__(self, index):
 
-        logging.info("inside get item")
+        if index >= self.limit:
+            raise IndexError("Index out of range")
+
         if self.mode == 'seq':
 
             #get the current visual observation and underlying state
@@ -73,12 +75,15 @@ class CustomDataset(Dataset):
             self.data_env.step(actions)
 
         elif self.mode == 'cont':
-            logging.info("before reset")
             #NOTE: input controlled_factors as empty dictionary so that all factors are randomized following env rules
             self.data_env.env = self.data_env.custom_resetter.factored_reset(self.data_env.env, self.data_env.env.unwrapped.grid.height, self.data_env.env.unwrapped.grid.width, {})
             logging.info("after reset")
             #get the current visual observation and underlying state
             obs = self.data_env.get_curr_obs()
+            state = self.data_env._construct_state()
+        elif self.mode == 'rand':
+
+            obs, info = self.data_env.reset()
             state = self.data_env._construct_state()
 
         elif self.mode == 'triplet':
@@ -88,8 +93,7 @@ class CustomDataset(Dataset):
 
         self.count += 1
         state = [item for sublist in state.values() for item in (sublist if isinstance(sublist, tuple) else [sublist])]
-        
-        logging.info("get info returned")
+
         return obs, state 
 
 
@@ -107,10 +111,18 @@ class RandomPolicy:
 
 if __name__ == "__main__":
 
-    dataset = CustomDataset('configs/data_generator/config.yaml', max_count=100, mode='cont')
+    dataset = CustomDataset('configs/data_generator/config.yaml', limit=30, mode='cont')
 
-    #pdb.set_trace()
+    pdb.set_trace()
+    from PIL import Image
 
-    for i, d in enumerate(dataset):
-        print(i, d[0].shape)
-        Image.fromarray(d[0]).save(f'data/train_data/{i}.png')
+    os.makedirs('./temp', exist_ok = True)
+
+    for i,d in enumerate(dataset):
+
+        img = Image.fromarray(d[0])
+        img.save(f'./temp/{i+1}.png')
+        print(i+1)
+        print(dataset.count)
+        print(dataset.limit)
+        print('-------')

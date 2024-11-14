@@ -14,3 +14,4 @@ multirun/*
 outputs/*
 
 ssl_setup.eeg-info
+*.egg-info

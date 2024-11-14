@@ -10,6 +10,7 @@ policy_head:
   reward_log_freq: 2000
   save_weight_freq: 50000
   wandb_log: true
+  normalize: true
 
   ppo:
     # n_steps: 2048

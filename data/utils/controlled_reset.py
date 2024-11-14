@@ -94,6 +94,7 @@ class CustomEnvReset:
 
         # Used locations
         used_locations = set([(0,0)])
+        used_columns = set([0])
 
 
         #all set factor values
@@ -123,26 +124,36 @@ class CustomEnvReset:
 
         for f in remaining_factors:
 
+            if f == 'door_pos':
+
+                rand_door_loc = (0,0)
+                
+                while (rand_door_loc in used_locations) or (rand_door_loc[0] in used_columns) or (isinstance(env.unwrapped.grid.get(rand_door_loc[0], rand_door_loc[1]), Wall)):
+                    
+                    rand_door_loc = (env.unwrapped._rand_int(2, width - 2), env.unwrapped._rand_int(1, height - 2))
+                    print(rand_door_loc)
+                    
+                
+                all_factors[f] = rand_door_loc
+                
+                used_locations.add(rand_door_loc)
+                for i in range(env.unwrapped.height):
+                    used_locations.add((rand_door_loc[0],i))
+                
+                used_columns.add(rand_door_loc[0])
+                
+
             if f == 'goal_pos':
                 rand_goal_loc = (0,0)
-
-                while (rand_goal_loc in used_locations) and (isinstance(env.unwrapped.grid.get(rand_goal_loc[0], rand_goal_loc[1]), Wall)):
+                
+                while (rand_goal_loc in used_locations) or (isinstance(env.unwrapped.grid.get(rand_goal_loc[0], rand_goal_loc[1]), Wall)):
                     
                     rand_goal_loc =  (env.unwrapped._rand_int(1, width - 1), env.unwrapped._rand_int(1, height - 1))
                 
                 all_factors[f] = rand_goal_loc
                 used_locations.add(rand_goal_loc)
-            
-            if f == 'door_pos':
-
-                rand_door_loc = (0,0)
-                logging.info("139")
-                while (rand_door_loc in used_locations) and (isinstance(env.unwrapped.grid.get(rand_door_loc[0], rand_door_loc[1]), Wall)):
-                    
-                    rand_door_loc = (env.unwrapped._rand_int(2, width - 2), env.unwrapped._rand_int(1, height - 2))
+                used_columns.add(rand_goal_loc[0])
                 
-                all_factors[f] = rand_door_loc
-                used_locations.add(rand_door_loc)
             
             if f == 'door_locked':
 
@@ -153,13 +164,15 @@ class CustomEnvReset:
             
             if f == 'agent_pos':
                 rand_agent_loc = (0,0)
-                logging.info("156")
-                while (rand_agent_loc in used_locations) and (isinstance(env.unwrapped.grid.get(rand_agent_loc[0], rand_agent_loc[1]), Wall)):
+                
+                while (rand_agent_loc in used_locations) or (isinstance(env.unwrapped.grid.get(rand_agent_loc[0], rand_agent_loc[1]), Wall)):
                     
                     rand_agent_loc = (env.unwrapped._rand_int(1, width - 1), env.unwrapped._rand_int(1, height - 1))
                 
                 all_factors[f] = rand_agent_loc
                 used_locations.add(rand_agent_loc)
+                used_columns.add(rand_agent_loc[0])
+                
 
             if f == 'agent_dir':
                 all_factors[f] = env.unwrapped._rand_int(0, 4)
@@ -176,11 +189,14 @@ class CustomEnvReset:
                 #set key location anywhere if not holding and door open
                 if not all_factors['holding_key'] and all_factors['door_open']:
                     rand_key_loc = (0,0)
-                    logging.info("179")
-                    while (rand_key_loc  in used_locations) and isinstance(env.unwrapped.grid.get(rand_key_loc[0], rand_key_loc[1]), Wall):
-
+                    
+                    while (rand_key_loc  in used_locations) or isinstance(env.unwrapped.grid.get(rand_key_loc[0], rand_key_loc[1]), Wall):
+                        
                         rand_key_loc = (env.unwrapped._rand_int(1, width - 1), env.unwrapped._rand_int(1, height - 1))
-                
+                    
+
+                    used_locations.add(rand_key_loc)
+                    used_columns.add(rand_key_loc[0])
                 #set key location to left half if not holding and door not open
                 elif not all_factors['holding_key'] and not all_factors['door_open']:
                     rand_key_loc = (0,0)
@@ -188,11 +204,14 @@ class CustomEnvReset:
                     #align key position so that it is on the same side of the door as the agent is
                     min_col = 1 if all_factors['agent_pos'][0] < all_factors['door_pos'][0] else all_factors['door_pos'][0] + 1
                     max_col = all_factors['door_pos'][0] - 1 if all_factors['agent_pos'][0] < all_factors['door_pos'][0] else width-1
-                    logging.info("191")
-                    while (rand_key_loc  in used_locations) and isinstance(env.unwrapped.grid.get(rand_key_loc[0], rand_key_loc[1]), Wall):
+                    
+                    while (rand_key_loc  in used_locations) or isinstance(env.unwrapped.grid.get(rand_key_loc[0], rand_key_loc[1]), Wall):
                         
-                        rand_key_loc = (env.unwrapped._rand_int(min_col, max_col), env.unwrapped._rand_int(1, height - 1))
+                        rand_key_loc = (env.unwrapped._rand_int(min_col, max_col) if min_col!=max_col else min_col, env.unwrapped._rand_int(1, height - 1))
+                    
 
+                    used_locations.add(rand_key_loc)
+                    used_columns.add(rand_key_loc[0])
                 #set key location to none if holding
                 elif all_factors['holding_key']:
 
@@ -200,9 +219,10 @@ class CustomEnvReset:
                 
                 all_factors[f] = rand_key_loc
         
-        logging.info("203")
+        
         # factor 1: add goal position 
         env.unwrapped.put_obj(Goal(), all_factors['goal_pos'][0], all_factors['goal_pos'][1])
+        assert 'goal' in set([x.type if x is not None else None for x in env.unwrapped.grid.grid]), 'No GOAL!'
         
         # factor 2, 3, 4: add door position, with locked/unlocked and open/closed settings
         splitIdx = all_factors['door_pos'][0]; doorIdx = all_factors['door_pos'][1]
@@ -214,20 +234,24 @@ class CustomEnvReset:
         logging.info("214")
         # factor 5: add key position and holding
         # factor 6: control holding key
+        
         if all_factors['key_pos'] != (None, None):
-            key_top = all_factors['key_pos']
-            key_size = (1,1)
-            env.unwrapped.place_obj(obj=Key("yellow"), top= key_top, size= key_size)
+            
+            
+            env.unwrapped.put_obj(Key("yellow"), all_factors['key_pos'][0], all_factors['key_pos'][1])
+            
+            assert 'key' in set([x.type if x is not None else None for x in env.unwrapped.grid.grid]), 'No GOAL!'
         
         else:
             logging.info("223")
             env.unwrapped.carrying = Key("yellow")
-            logging.info("225")
-
+        
         # factor 7, 8: add agent position and direction
-        agent_top = all_factors['agent_pos']
-        agent_size = (1,1)
-        env.unwrapped.place_agent(top=agent_top, size=agent_size)
+        # agent_top = all_factors['agent_pos']
+        # agent_size = (0,0)
+        # env.unwrapped.place_agent(top=agent_top, size=agent_size)
+        env.unwrapped.agent_pos = all_factors['agent_pos']
+        
         env.unwrapped.agent_dir = all_factors['agent_dir']
         logging.info("232")
         env.unwrapped.mission = "use the key to open the door and then get to the goal"
@@ -418,7 +442,7 @@ class CustomEnvReset:
 
         # factor 1 / 2: set agent position and direction
         agent_top = all_factors['agent_pos']
-        agent_size = (1,1)
+        agent_size = (0,0)
         env.unwrapped.place_agent(top=agent_top, size=agent_size)
         env.unwrapped.agent_dir = all_factors['agent_dir']
         

@@ -78,7 +78,7 @@ class DataGenerator(gym.Env):
         self.env = FullyObsWrapper(self.env)
         self.env = ImgObsWrapper(self.env)
 
-        self.env.max_steps = configs['max_steps']
+        # self.env.max_steps = configs['max_steps']
         self.env = TimeLimit(self.env, max_episode_steps=configs['max_steps'])
 
         # Wrap the environment to enable stochastic actions

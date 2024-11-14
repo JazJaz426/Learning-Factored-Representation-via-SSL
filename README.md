@@ -44,15 +44,12 @@ pip install -e .
 # run ssl training script
 Train with the data generator giving data in an "online" manner.
 ```bash
-python train.py --config-name=ssl_methods/barlow_rl.yaml -m
-```
-
-Train with the data being available like an ImageFolder.
-```bash
-python train.py --config-name=ssl_methods/barlow_rl.yaml -m
+echo $USER
+python train.py --config-name=ssl_methods/barlow_rl.yaml user@_global_=$USER/run_slurm -m
 ```
 
 Train for testing SSL method works with CIFAR10.
 ```bash
-python train.py --config-name=ssl_methods/barlow_cifar10.yaml -m
+echo $USER
+python train.py --config-name=ssl_methods/barlow_cifar10.yaml user@_global_=$USER/run_slurm -m
 ```
