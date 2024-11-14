@@ -129,7 +129,7 @@ class CustomEnvReset:
                 while (rand_door_loc in used_locations) or (rand_door_loc[0] in used_columns) or (isinstance(env.unwrapped.grid.get(rand_door_loc[0], rand_door_loc[1]), Wall)):
                     
                     rand_door_loc = (env.unwrapped._rand_int(2, width - 2), env.unwrapped._rand_int(1, height - 2))
-                    print(rand_door_loc)
+                    # print("rand_door_loc:", rand_door_loc)
                     
                 
                 all_factors[f] = rand_door_loc

@@ -17,6 +17,7 @@ import numpy as np
 import pdb
 from PIL import Image
 
+
 class CustomDataset(Dataset):
     def __init__(self, data_env_config, limit, policy_model = None, model_path = None, mode = 'seq'):
         
@@ -52,20 +53,28 @@ class CustomDataset(Dataset):
 
                 sampled_factors[attr] = rand_val
 
-
             valid, err = self.data_env.custom_resetter.check_valid_factors(self.data_env.env, sampled_factors)
 
         return sampled_factors
 
 
-
     def __getitem__(self, index):
-
+        """Example dictionary returned from this get_item.
+        {
+            "previous_obs": None,
+            "current_obs": None,
+            "previous_state": None,
+            "current_state": None,
+            "previous_norm_state": None,
+            "current_norm_state": None,
+            "action": None
+        }
+        """
         if index >= self.limit:
             raise IndexError("Index out of range")
 
+        item_dict = {}
         if self.mode == 'seq':
-
             #get the current visual observation and underlying state
             obs_pre = self.data_env.get_curr_obs()
             state_pre, norm_state_pre = self._construct_state()
@@ -78,33 +87,43 @@ class CustomDataset(Dataset):
             obs_post = self.data_env.get_curr_obs()
             state_post, norm_state_post = self._construct_state()
             
-            #NOTE: only for sequential data generation, use the policy to output a
-            return (obs_pre, obs_post), (state_pre, state_post), (norm_state_pre, norm_state_post), action
-
-
-
+            # NOTE: only for sequential data generation, use the policy to output a
+            # (obs_pre, obs_post), (state_pre, state_post), (norm_state_pre, norm_state_post), action
+            item_dict["previous_obs"] = obs_pre
+            item_dict["current_obs"] = obs_post
+            item_dict["previous_state"] = state_pre
+            item_dict["current_state"] = state_post
+            item_dict["previous_norm_state"] = norm_state_pre
+            item_dict["current_norm_state"] = norm_state_post
+            item_dict["action"] = action
+            return item_dict
         elif self.mode == 'cont':
             #NOTE: input controlled_factors as empty dictionary so that all factors are randomized following env rules
             self.data_env.env = self.data_env.custom_resetter.factored_reset(self.data_env.env, self.data_env.env.unwrapped.grid.height, self.data_env.env.unwrapped.grid.width, {})
-            logging.info("after reset")
+            # logging.info("after reset")
             #get the current visual observation and underlying state
             obs = self.data_env.get_curr_obs()
             state, norm_state = self.data_env._construct_state()
+            action = None
         elif self.mode == 'rand':
-
             obs, info = self.data_env.reset()
             state, norm_state = self.data_env._construct_state()
-
-            
-
+            action = None
         elif self.mode == 'triplet':
             raise NotImplementedError(f'ERROR: data generation mode cannot be {self.mode}')
         else:
             raise NotImplementedError(f'ERROR: data generation mode cannot be {self.mode}')
 
         self.count += 1
+        if action is None:
+            action = self.data_env.action_space.sample()
+        assert action is not None, "Data loader batch collator in torch requires dtypes to be not None"
 
-        return obs, norm_state, state, None
+        item_dict["previous_obs"] = obs
+        item_dict["previous_state"] = state
+        item_dict["previous_norm_state"] = norm_state
+        item_dict["action"] = action
+        return item_dict
 
 
 class RandomPolicy:
