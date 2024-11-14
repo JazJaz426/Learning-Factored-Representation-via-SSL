@@ -32,8 +32,8 @@ from stable_ssl.config import (
     WandbConfig,
 )
 
-from src.ssl_dataset.base import DataConfig
-from ssl_models.factored_models import CovarianceFactorizationConfig, MaskingFactorizationConfig
+from data.ssl_dataset.base import DataConfig
+from models.ssl_models.factored_models import CovarianceFactorizationConfig, MaskingFactorizationConfig
 
 _MODEL_CONFIGS = {
     "Supervised": ModelConfig,

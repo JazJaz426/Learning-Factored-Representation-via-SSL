@@ -73,7 +73,6 @@ class CustomEnvReset:
     def _custom_reset_doorkey(self, env, width, height, controlled_factors={}):
         
         #change the random seed locally 
-        logging.info("76")
         curr_rng = env.unwrapped.np_random
         local_rng = np.random.default_rng(int(100*random.random()))
         env.unwrapped.np_random = local_rng
@@ -118,7 +117,6 @@ class CustomEnvReset:
 
             all_factors[f] = factor
         
-        logging.info("120")
         #randomly set the factor values for all other factors: sample until they are not in used locations
         remaining_factors = list(sorted(self.all_factors - set(list(controlled_factors.keys()))))
 
@@ -228,10 +226,8 @@ class CustomEnvReset:
         splitIdx = all_factors['door_pos'][0]; doorIdx = all_factors['door_pos'][1]
         door_locked = all_factors['door_locked']
         door_open = all_factors['door_open']
-        logging.info("211")
         env.unwrapped.grid.vert_wall(splitIdx, 0)
         env.unwrapped.put_obj(Door("yellow", is_locked=door_locked, is_open=door_open), splitIdx, doorIdx)
-        logging.info("214")
         # factor 5: add key position and holding
         # factor 6: control holding key
         
@@ -243,7 +239,6 @@ class CustomEnvReset:
             assert 'key' in set([x.type if x is not None else None for x in env.unwrapped.grid.grid]), 'No GOAL!'
         
         else:
-            logging.info("223")
             env.unwrapped.carrying = Key("yellow")
         
         # factor 7, 8: add agent position and direction
@@ -253,12 +248,10 @@ class CustomEnvReset:
         env.unwrapped.agent_pos = all_factors['agent_pos']
         
         env.unwrapped.agent_dir = all_factors['agent_dir']
-        logging.info("232")
         env.unwrapped.mission = "use the key to open the door and then get to the goal"
         
         #reset the original rng after resetting env
         env.unwrapped.np_random = curr_rng
-        logging.info("235")
         return env
 
     def _custom_reset_empty(self, env, width, height, controlled_factors={}):

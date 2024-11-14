@@ -23,7 +23,6 @@ data:
     data_env_config: ${local_data_path.data_env_config}
     limit: 50000
     policy_model: null
-    limit: 1000
     model_path: null
     mode: cont
     # path: ${local_data_path.cifar10_path}
@@ -83,7 +82,6 @@ data:
     name: CustomDataset
     data_env_config: ${local_data_path.data_env_config}
     policy_model: null
-    limit: 1000
     model_path: null
     limit: 10000
     mode: cont
