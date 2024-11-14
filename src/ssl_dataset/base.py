@@ -93,7 +93,7 @@ class DatasetConfig(base.DatasetConfig):
 
     disentangle: DisentangledAugmentation = None
     data_env_config: Optional[str] = None
-    max_count: Optional[int] = 1000
+    limit: Optional[int] = 1000
     policy_model: Optional[str] = None
     model_path: Optional[str] = None
     mode: Optional[str] = 'seq'
@@ -137,7 +137,7 @@ class DatasetConfig(base.DatasetConfig):
         else:
             dataset = CustomDataset(
                 data_env_config = self.data_env_config,
-                max_count= self.max_count,
+                limit= self.limit,
                 policy_model = self.policy_model,
                 model_path = self.model_path,
                 mode = self.mode,
