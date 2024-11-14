@@ -112,6 +112,30 @@ class CustomDataset(Dataset):
             state, norm_state = self.data_env._construct_state()
             action = None
         elif self.mode == 'triplet':
+            #get the current visual observation and underlying state
+            obs_pre = self.data_env.get_curr_obs()
+            state_pre, norm_state_pre = self._construct_state()
+            
+            #predict action and take a step in the environment
+            action, __ = self.model.predict(obs, deterministic=True)
+            self.data_env.step(action)
+
+            #get the future visual observation and underlying state
+            obs_post = self.data_env.get_curr_obs()
+            state_post, norm_state_post = self._construct_state()
+            
+            item_dict = {}
+            item_dict["previous_obs"] = obs_pre
+            item_dict["current_obs"] = obs_post
+            item_dict["alternate_obs"] = None  # TODO
+            item_dict["previous_state"] = state_pre
+            item_dict["current_state"] = state_post
+            item_dict["alternate_state"] = None  # TODO
+            item_dict["previous_norm_state"] = norm_state_pre
+            item_dict["current_norm_state"] = norm_state_post
+            item_dict["alternate_norm_state"] = None  # TODO
+            item_dict["action"] = action
+            item_dict["alternate_action"] = None  # TODO
             raise NotImplementedError(f'ERROR: data generation mode cannot be {self.mode}')
         else:
             raise NotImplementedError(f'ERROR: data generation mode cannot be {self.mode}')

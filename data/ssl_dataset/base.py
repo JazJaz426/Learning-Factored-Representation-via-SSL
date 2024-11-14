@@ -29,7 +29,20 @@ class GridworldDataset(Dataset):
         return len(self.dataset)
 
     def __getitem__(self, idx):
-        if self.mode=='seq':
+        item_dict = self.dataset[idx]
+        if self.mode in ['cont', 'rand']:
+            """
+                item_dict["previous_obs"] = obs
+                item_dict["previous_state"] = state
+                item_dict["previous_norm_state"] = norm_state
+                item_dict["action"] = action
+            """
+            x = item_dict["previous_obs"]
+            y = item_dict["previous_norm_state"]
+            z = item_dict["action"]
+            if self.transforms is not None:
+                x = Sampler(self.transforms)(x)  # 1 z gets 2 or more positive views
+        elif self.mode=='seq':
             """
                 item_dict["previous_obs"] = obs_pre
                 item_dict["current_obs"] = obs_post
@@ -39,7 +52,6 @@ class GridworldDataset(Dataset):
                 item_dict["current_norm_state"] = norm_state_post
                 item_dict["action"] = action
             """
-            item_dict = self.dataset[idx]
             if self.transforms is not None:
                 assert len(self.transforms) == 2
                 item_dict["previous_obs"] = Sampler(self.transforms[0])(item_dict["previous_obs"])
@@ -47,19 +59,14 @@ class GridworldDataset(Dataset):
             x = [item_dict["previous_obs"], item_dict["current_obs"]]
             y = item_dict["previous_norm_state"]
             z = item_dict["action"]
-        elif self.mode in ['cont', 'rand']:
-            """
-                item_dict["previous_obs"] = obs
-                item_dict["previous_state"] = state
-                item_dict["previous_norm_state"] = norm_state
-                item_dict["action"] = action
-            """
-            item_dict = self.dataset[idx]
-            x = item_dict["previous_obs"]
+        elif self.mode=='triplet':
+            assert len(self.transforms) == 3
+            item_dict["previous_obs"] = Sampler(self.transforms[0])(item_dict["previous_obs"])
+            item_dict["current_obs"] = Sampler(self.transforms[1])(item_dict["current_obs"])
+            item_dict["alternate_obs"] = Sampler(self.transforms[2])(item_dict["alternate_obs"])
+            x = [item_dict["previous_obs"], item_dict["current_obs"], item_dict["alternate_obs"]]
             y = item_dict["previous_norm_state"]
-            z = item_dict["action"]
-            if self.transforms is not None:
-                x = Sampler(self.transforms)(x)  # 1 z gets 2 or more positive views
+            z = [item_dict["action"], item_dict["alternate_action"]]
         else:
             NotImplementedError(f"{self.mode} not implemented since not implemented in the dataset generator.")
 
