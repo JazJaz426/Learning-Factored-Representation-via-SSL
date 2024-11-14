@@ -68,7 +68,7 @@ class CustomDataset(Dataset):
 
             #get the current visual observation and underlying state
             obs = self.data_env.get_curr_obs()
-            state = self._construct_state()
+            state, norm_state = self._construct_state()
             
             #predict action and take a step in the environment
             actions, __ = self.model.predict(obs, deterministic=True)
@@ -80,11 +80,11 @@ class CustomDataset(Dataset):
             logging.info("after reset")
             #get the current visual observation and underlying state
             obs = self.data_env.get_curr_obs()
-            state = self.data_env._construct_state()
+            state, norm_state = self.data_env._construct_state()
         elif self.mode == 'rand':
 
             obs, info = self.data_env.reset()
-            state = self.data_env._construct_state()
+            state, norm_state = self.data_env._construct_state()
 
         elif self.mode == 'triplet':
             raise NotImplementedError(f'ERROR: data generation mode cannot be {self.mode}')
@@ -92,9 +92,8 @@ class CustomDataset(Dataset):
             raise NotImplementedError(f'ERROR: data generation mode cannot be {self.mode}')
 
         self.count += 1
-        state = [item for sublist in state.values() for item in (sublist if isinstance(sublist, tuple) else [sublist])]
 
-        return obs, state 
+        return obs, norm_state, state 
 
 
 class RandomPolicy:

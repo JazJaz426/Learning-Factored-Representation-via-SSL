@@ -102,7 +102,7 @@ class DataGenerator(gym.Env):
         #creating the observation space and actions space
         self.action_space = self.env.action_space
         
-        self.observation_space = self._create_observation_space(configs['state_attribute_types'])
+        self.observation_space, self.expert_observation_space = self._create_observation_space(configs['state_attribute_types'])
 
 
         #creating other gym environment attributes
@@ -110,36 +110,36 @@ class DataGenerator(gym.Env):
         self.metadata = self.env.metadata
         self.np_random = self.env.np_random
 
+    def _create_expert_observation_space(self, state_attribute_types):
+
+        self.gym_space_params = {'boolean': (0, 1, int), 'coordinate_width': (0, self.env.grid.width, int), 'coordinate_height': (0, self.env.grid.height, int), 'agent_dir': (0, 3, int)}
+
+        relevant_state_variables = sorted(self.state_attributes)
+
+        min_values = np.array([]); max_values = np.array([])
+
+        for var in relevant_state_variables:
+            types = state_attribute_types[var]
+
+            for t in types:
+                
+                space_param = self.gym_space_params[t]
+
+                min_values = np.append(min_values, space_param[0])
+                max_values = np.append(max_values, space_param[1])
+        
+        return gym.spaces.Box(low=min_values, high=max_values, dtype=int)
 
     def _create_observation_space(self, state_attribute_types):
         #return the desired gym Spaces based on the observation space
 
         if self.observation_type == 'image':
             frame = self.env.unwrapped.get_frame(tile_size=8)
-            return gym.spaces.Box(low=0, high=255, shape=frame.shape, dtype=np.uint8)
+            return gym.spaces.Box(low=0, high=255, shape=frame.shape, dtype=np.uint8), self._create_expert_observation_space(state_attribute_types)
 
         elif self.observation_type == 'expert':
-            
-            self.gym_space_params = {'boolean': (0, 1, int), 'coordinate_width': (0, self.env.grid.width, int), 'coordinate_height': (0, self.env.grid.height, int), 'agent_dir': (0, 3, int)}
-
-            relevant_state_variables = sorted(self.state_attributes)
-
-            min_values = np.array([]); max_values = np.array([])
-
-            for var in relevant_state_variables:
-                types = state_attribute_types[var]
-
-                for t in types:
-                    
-                    space_param = self.gym_space_params[t]
-
-                    min_values = np.append(min_values, space_param[0])
-                    max_values = np.append(max_values, space_param[1])
-            
-            
-            return gym.spaces.Box(low=min_values, high=max_values, dtype=int)
-
-
+            expert_observation_space = self._create_expert_observation_space(state_attribute_types)
+            return expert_observation_space, expert_observation_space
 
 
         elif self.observation_type == 'factored':
@@ -326,8 +326,8 @@ class DataGenerator(gym.Env):
 
         norm_state_array = np.array([item for key in sorted(state.keys()) for item in (state[key] if isinstance(state[key], tuple) else [state[key]])])
 
-        min_values = np.array(self.observation_space.low)
-        max_values = np.array(self.observation_space.high)
+        min_values = np.array(self.expert_observation_space.low)
+        max_values = np.array(self.expert_observation_space.high)
         
         #construct normalized state array output
         norm_state_array = list((norm_state_array - min_values) / (max_values - min_values))
