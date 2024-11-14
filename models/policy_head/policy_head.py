@@ -27,7 +27,7 @@ from custom_callbacks import CustomEvalCallback, CustomVideoRecorder, RewardValu
 
 
 class PolicyHead:
-    def __init__(self, model_config_path, data_config_path, seed=None):
+    def __init__(self, model_config_path, data_config_path, seed=None, run_name=None):
         self.model_config = self.load_config(os.path.join(os.path.dirname(__file__), '../..', model_config_path))['policy_head']
         self.data_config = self.load_config(os.path.join(os.path.dirname(__file__), '../..', data_config_path))
         self.algorithm = self.model_config['algorithm']
@@ -39,10 +39,16 @@ class PolicyHead:
 
         print('POLICY NAME: ', self.policy_name)
         
-
+        self.run_name = run_name
+        
+        if run_name is not None:
+            self.log_path = f"./logs/{run_name}_{self.algorithm}_{self.data_config['environment_name']}"
+        else:
+            self.log_path = f"./logs/{self.algorithm}_{self.data_config['environment_name']}"
+        print("log path:", self.log_path)
         self.parallel_train_env = VecVideoRecorder(
             VecNormalize(self.create_parallel_envs(seed = self.seed), training=True, norm_obs=True, norm_reward=False, clip_obs=np.inf), 
-            f"./logs/{self.algorithm}_{self.data_config['environment_name']}_policyviz/{self.data_config['observation_space']}/seed_{self.seed}/", 
+            f"{self.log_path}/policyviz/{self.data_config['observation_space']}/seed_{self.seed}/", 
             record_video_trigger=lambda x: x % (self.model_config['video_log_freq'] // self.model_config['num_parallel_envs']) == 0, 
             video_length=self.model_config['video_length'], 
             name_prefix=self.policy_name
@@ -58,6 +64,12 @@ class PolicyHead:
 
 
         self.model = self.create_models(seed=self.seed)
+        self.model_info = self.model.get_parameters()
+
+        #check that critical configs for test and train are equal 
+        assert (self.valid_env.observation_space == self.eval_env.observation_space), \
+            f"ERROR: observaiton type {self.valid_env.observation_space} and environment {self.eval_env.observation_space} need to be same for train and eval configs"
+
 
         #check that critical configs for test and train are equal 
         assert (self.valid_env.observation_space == self.eval_env.observation_space), \
@@ -129,7 +141,7 @@ class PolicyHead:
                 env=self.parallel_train_env,
                 seed=seed,
                 **ppo_params,
-                tensorboard_log=f"./logs/{self.algorithm}_{self.data_config['environment_name']}_tensorboard/{self.data_config['observation_space']}/seed_{seed}/"
+                tensorboard_log=f"{self.log_path}/tensorboard/{self.data_config['observation_space']}/seed_{seed}/"
             )
         elif self.algorithm == "DQN":
             dqn_params = {k: v for k, v in self.model_config['dqn'].items() if v is not None}
@@ -138,7 +150,7 @@ class PolicyHead:
                 env=self.parallel_train_env,
                 seed=seed,
                 **dqn_params,
-                tensorboard_log=f"./logs/{self.algorithm}_{self.data_config['environment_name']}_tensorboard/{self.data_config['observation_space']}/seed_{seed}/"
+                tensorboard_log=f"{self.log_path}/tensorboard/{self.data_config['observation_space']}/seed_{seed}/"
             )
         elif self.algorithm == "A2C":
             a2c_params = {k: v for k, v in self.model_config['a2c'].items() if v is not None}
@@ -147,7 +159,7 @@ class PolicyHead:
                 env=self.parallel_train_env,
                 seed=seed,
                 **a2c_params,
-                tensorboard_log=f"./logs/{self.algorithm}_{self.data_config['environment_name']}_tensorboard/{self.data_config['observation_space']}/seed_{seed}/"
+                tensorboard_log=f"{self.log_path}/tensorboard/{self.data_config['observation_space']}/seed_{seed}/"
             )
         else:
             raise ValueError(f"Unsupported RL algorithm: {self.algorithm}")
@@ -158,23 +170,25 @@ class PolicyHead:
         wandb.init(
             project='ssl_rl',
             entity='ssl-factored-reps', 
-            name=f'{self.algorithm}_{self.data_config["environment_name"]}_{self.data_config["observation_space"]}_seed_{self.seed}',
-            group=f'{self.algorithm}_{self.data_config["environment_name"]}_{self.data_config["observation_space"]}',
+            name=f'{self.run_name}_{self.algorithm}_{self.data_config["environment_name"]}_{self.data_config["observation_space"]}_seed_{self.seed}',
+            group=f'{self.run_name}_{self.algorithm}_{self.data_config["environment_name"]}_{self.data_config["observation_space"]}',
             sync_tensorboard=True,
             monitor_gym=True,
             config={
                 "model": self.model_config,
+                "model_info": self.model_info,
                 "data": self.data_config,
                 "seed": self.seed
             }
         )
         train_interval = self.model_config['train_interval']
 
-        if os.path.exists(f"./logs/{self.algorithm}_{self.data_config['environment_name']}_weights/{self.data_config['observation_space']}/seed_{self.seed}") and len(os.listdir(f"./logs/{self.algorithm}_{self.data_config['environment_name']}_weights/{self.data_config['observation_space']}/seed_{self.seed}")) > 0:
+        if os.path.exists(f"{self.log_path}/weights/{self.data_config['observation_space']}/seed_{self.seed}") and \
+                len(os.listdir(f"{self.log_path}/weights/{self.data_config['observation_space']}/seed_{self.seed}")) > 0:
             try:
                 #fetch the best weights for the model rather than latest
-                best_weight = os.listdir(f"./logs/{self.algorithm}_{self.data_config['environment_name']}_weights/{self.data_config['observation_space']}/seed_{self.seed}/best_weight")[0].split('.')[0]
-                final_path = os.path.join(f"./logs/{self.algorithm}_{self.data_config['environment_name']}_weights/{self.data_config['observation_space']}/seed_{self.seed}/best_weight", best_weight)
+                best_weight = os.listdir(f"{self.log_path}/weights/{self.data_config['observation_space']}/seed_{self.seed}/best_weight")[0].split('.')[0]
+                final_path = os.path.join(f"{self.log_path}/weights/{self.data_config['observation_space']}/seed_{self.seed}/best_weight", best_weight)
 
                 self.model.load(path = final_path, env = self.parallel_train_env)
             except:
@@ -182,12 +196,39 @@ class PolicyHead:
 
             
         # Use Built-in Eval Callback to support multiple parallel environments
-        reward_validation_callback = CustomEvalCallback("validation", eval_env=self.valid_env, n_eval_episodes=self.model_config['num_eval_eps'], eval_freq=self.model_config['reward_log_freq'], deterministic = True, log_path = f"./logs/{self.algorithm}_{self.data_config['environment_name']}_tensorboard/{self.data_config['observation_space']}/seed_{self.seed}/", best_model_save_path = f"./logs/{self.algorithm}_{self.data_config['environment_name']}_weights/{self.data_config['observation_space']}/seed_{self.seed}/best_weight")
-        reward_eval_callback = CustomEvalCallback("eval", eval_env=self.eval_env, n_eval_episodes=self.model_config['num_eval_eps'], eval_freq=self.model_config['reward_log_freq'], deterministic = True, log_path = f"./logs/{self.algorithm}_{self.data_config['environment_name']}_tensorboard/{self.data_config['observation_space']}/seed_{self.seed}/", best_model_save_path = None)
+        reward_validation_callback = CustomEvalCallback(
+            "validation", 
+            eval_env=self.valid_env, 
+            n_eval_episodes=self.model_config['num_eval_eps'], 
+            eval_freq=self.model_config['reward_log_freq'],
+            deterministic = True, 
+            log_path = f"{self.log_path}/tensorboard/{self.data_config['observation_space']}/seed_{self.seed}/", 
+            best_model_save_path = f"{self.log_path}/weights/{self.data_config['observation_space']}/seed_{self.seed}/best_weight"
+        )
+        reward_eval_callback = CustomEvalCallback(
+            "eval", 
+            eval_env=self.eval_env, 
+            n_eval_episodes=self.model_config['num_eval_eps'], 
+            eval_freq=self.model_config['reward_log_freq'], 
+            deterministic = True, 
+            log_path = f"{self.log_path}/tensorboard/{self.data_config['observation_space']}/seed_{self.seed}/", 
+            best_model_save_path = None
+        )
        
         # VecVideoRecorder is used instead of GifLoggingCallback
-        value_callback = ValuePlottingCallback(env = self.dummy_env, save_freq = self.model_config['video_log_freq'], log_dir = f"./logs/{self.algorithm}_{self.data_config['environment_name']}_policyviz/{self.data_config['observation_space']}/seed_{self.seed}/", num_envs= self.model_config['num_parallel_envs'], name_prefix = f'{self.policy_name}_policy_value')
-        checkpoint_callback = CheckpointCallback(save_freq=self.model_config['save_weight_freq']//self.model_config['num_parallel_envs'], save_path=f"./logs/{self.algorithm}_{self.data_config['environment_name']}_weights/{self.data_config['observation_space']}/seed_{self.seed}/", name_prefix=f'{self.algorithm}_seed{self.seed}_step', save_replay_buffer=True)
+        value_callback = ValuePlottingCallback(
+            env = self.dummy_env, 
+            save_freq = self.model_config['video_log_freq'], 
+            log_dir = f"{self.log_path}/policyviz/{self.data_config['observation_space']}/seed_{self.seed}/", 
+            num_envs= self.model_config['num_parallel_envs'], 
+            name_prefix = f'{self.policy_name}_policy_value'
+        )
+        checkpoint_callback = CheckpointCallback(
+            save_freq=self.model_config['save_weight_freq']//self.model_config['num_parallel_envs'], 
+            save_path=f"{self.log_path}/weights/{self.data_config['observation_space']}/seed_{self.seed}/", 
+            name_prefix=f'{self.algorithm}_seed{self.seed}_step', 
+            save_replay_buffer=True
+        )
 
 
         # Create the callback list
@@ -201,6 +242,7 @@ class PolicyHead:
 if __name__ == '__main__':
     args = argparse.ArgumentParser()
     args.add_argument('--seed', type=int, default=0)
+    args.add_argument('--run_name', type=str, default=None)
     args = args.parse_args()
     
     
@@ -210,7 +252,8 @@ if __name__ == '__main__':
     policy_head = PolicyHead( 
         'configs/models/config.yaml', 
         'configs/data_generator/config.yaml',
-        seed=args.seed
+        seed=args.seed,
+        run_name=args.run_name
     )
     policy_head.train_and_evaluate_policy()
 
