@@ -178,7 +178,7 @@ class CustomEnvReset:
                     rand_key_loc = (0,0)
                     logging.info("179")
                     while (rand_key_loc  in used_locations) and isinstance(env.unwrapped.grid.get(rand_key_loc[0], rand_key_loc[1]), Wall):
-                        
+
                         rand_key_loc = (env.unwrapped._rand_int(1, width - 1), env.unwrapped._rand_int(1, height - 1))
                 
                 #set key location to left half if not holding and door not open
