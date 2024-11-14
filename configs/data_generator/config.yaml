@@ -22,7 +22,7 @@ state_attributes: [agent_pos, agent_dir, goal_pos, key_pos, door_pos, holding_ke
 state_attribute_types: {'agent_pos': ['coordinate_width', 'coordinate_height'], 'agent_dir':['agent_dir'], 'goal_pos':['coordinate_width', 'coordinate_height'], 'key_pos':['coordinate_width', 'coordinate_height'], 'door_pos':['coordinate_width', 'coordinate_height'], 'holding_key': ['boolean'], 'door_locked':['boolean'], 'door_open':['boolean']}
 
 #options: [default, random, custom]
-reset_type: custom
+reset_type: default
 
 
 #options: [agent_pos: [x,y], agent_dir: [int], goal_pos: [x,y], key_pos: [x,y], door_pos: [x,y], holding_key: true/false, door_locked: true/false, door_open: true/false]
