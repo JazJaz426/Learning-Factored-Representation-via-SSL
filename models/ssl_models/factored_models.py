@@ -53,22 +53,20 @@ class CovarianceFactorization(JointEmbeddingModel):
             self.config.model.projector[-1],
             self.config.data.train_dataset.num_classes,
         )
-        self.curr_actions = None
         # the g_theta function in the architecture
         self.world_model = torch.nn.Linear(
-            fan_in+1, fan_in
+            self.config.model.projector[-1]+1, self.config.model.projector[-1]
         )
 
     def forward(self, x):
-        self.curr_actions = x[1]
         return self.backbone_classifier(self.backbone(x[0]))  # x is tuple of observation, action
 
     def compute_loss(self):
         embeddings = [self.backbone(view) for view in self.data[0][0]]
-        reconstruction = [self.world_model(torch.cat([embeddings[0], self.curr_actions], dim=1))]  # append a_i to z_i and pass to world model
         # loss_backbone = self._compute_backbone_classifier_loss(*embeddings)
 
         projections = [self.projector(embed) for embed in embeddings]
+        reconstruction = [self.world_model(torch.cat((projections[0], self.data[0][1]), dim=1))]  # append a_i to z_i and pass to world model
         # loss_proj = self._compute_projector_classifier_loss(*projections)
         loss_ssl = self.compute_ssl_loss(projections[0], projections[1], reconstruction[0])
 
