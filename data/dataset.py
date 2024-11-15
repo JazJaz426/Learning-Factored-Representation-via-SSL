@@ -76,7 +76,7 @@ class CustomDataset(Dataset):
         if self.mode == 'seq':
             #get the current visual observation and underlying state
             obs_pre = self.data_env.get_curr_obs()
-            state_pre, norm_state_pre = self._construct_state()
+            state_pre, norm_state_pre = self.data_env._construct_state()
             
             #predict action and take a step in the environment
             action, __ = self.model.predict(obs, deterministic=True)
@@ -84,7 +84,7 @@ class CustomDataset(Dataset):
 
             #get the future visual observation and underlying state
             obs_post = self.data_env.get_curr_obs()
-            state_post, norm_state_post = self._construct_state()
+            state_post, norm_state_post = self.data_env._construct_state()
             
             # NOTE: only for sequential data generation, use the policy to output a
             # (obs_pre, obs_post), (state_pre, state_post), (norm_state_pre, norm_state_post), action
