@@ -1,7 +1,7 @@
 import numpy as np
 from scipy.stats import spearmanr
 
-def frob_norm_diff_identity(codes, corr_type="correlation"):
+def frob_norm_diff_identity(codes, corr_type="spearman"):
     """
     Computes the Frobenius norm of the correlation or Spearman correlation matrix 
     of the feature representations minus the identity matrix.

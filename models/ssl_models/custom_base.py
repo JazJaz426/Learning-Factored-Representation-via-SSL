@@ -14,6 +14,8 @@ import torch
 import torch.nn.functional as F
 from torchmetrics.classification import MulticlassAccuracy
 
+from disentanglement_metrics.disentangelement_callback import FrobeniusNorm, ZMinVar, MutualInformationGap
+
 from stable_ssl.utils import load_nn, mlp, deactivate_requires_grad, update_momentum
 from stable_ssl.base import BaseModel, ModelConfig
 
@@ -131,6 +133,17 @@ class JointEmbeddingModel(BaseModel):
                     ),
                 }
             )
+        
+        self.metrics.update(
+            {
+                f"train/forb_norm": FrobeniusNorm(),
+                f"train/z_min_var": ZMinVar(),
+                f"train/mig": MutualInformationGap(),
+                f"test/forb_norm": FrobeniusNorm(),
+                f"test/z_min_var": ZMinVar(),
+                f"test/mig": MutualInformationGap()
+            }
+        )
 
 
 @dataclass
