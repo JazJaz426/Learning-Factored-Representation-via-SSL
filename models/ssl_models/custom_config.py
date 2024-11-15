@@ -32,8 +32,8 @@ from models.ssl_models.factored_models import CovarianceFactorizationConfig, Mas
 _MODEL_CONFIGS = {
     "Supervised": ModelConfig,
     "BarlowTwins": BarlowTwinsConfig,
-    "CovarianceFactorizationConfig": CovarianceFactorizationConfig,
-    "MaskingFactorizationConfig": MaskingFactorizationConfig,
+    "CovarianceFactorization": CovarianceFactorizationConfig,
+    "MaskingFactorization": MaskingFactorizationConfig,
 }
 
 _LOG_CONFIGS = {
