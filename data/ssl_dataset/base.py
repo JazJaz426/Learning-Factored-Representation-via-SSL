@@ -3,7 +3,7 @@ import os
 import logging
 from dataclasses import dataclass
 from typing import Optional
-
+import pdb
 from PIL import Image
 import torchvision
 import torch
@@ -43,6 +43,8 @@ class GridworldDataset(Dataset):
             x = item_dict["previous_obs"]
             y = item_dict["previous_norm_state"]
             z = item_dict["action"]
+
+            
             if self.transforms is not None:
                 if not isinstance(x, Image.Image):
                     x = Image.fromarray(x)
