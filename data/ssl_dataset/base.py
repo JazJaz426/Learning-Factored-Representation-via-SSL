@@ -3,7 +3,7 @@ import os
 import logging
 from dataclasses import dataclass
 from typing import Optional
-
+import pdb
 from PIL import Image
 import torchvision
 import torch
@@ -43,6 +43,8 @@ class GridworldDataset(Dataset):
             x = item_dict["previous_obs"]
             y = item_dict["previous_norm_state"]
             z = item_dict["action"]
+
+            
             if self.transforms is not None:
                 if not isinstance(x, Image.Image):
                     x = Image.fromarray(x)
@@ -63,8 +65,8 @@ class GridworldDataset(Dataset):
                     item_dict["previous_obs"] = Image.fromarray(item_dict["previous_obs"])
                 if not isinstance(item_dict["current_obs"], Image.Image):
                     item_dict["current_obs"] = Image.fromarray(item_dict["current_obs"])
-                item_dict["previous_obs"] = Sampler(self.transforms[0])(item_dict["previous_obs"])
-                item_dict["current_obs"] = Sampler(self.transforms[1])(item_dict["current_obs"])
+                item_dict["previous_obs"] = Sampler([self.transforms[0]])(item_dict["previous_obs"])
+                item_dict["current_obs"] = Sampler([self.transforms[1]])(item_dict["current_obs"])
             x = [item_dict["previous_obs"], item_dict["current_obs"]]
             y = item_dict["previous_norm_state"]
             z = [item_dict["action"]]
@@ -76,9 +78,9 @@ class GridworldDataset(Dataset):
                 item_dict["current_obs"] = Image.fromarray(item_dict["current_obs"])
             if not isinstance(item_dict["alternate_obs"], Image.Image):
                 item_dict["alternate_obs"] = Image.fromarray(item_dict["alternate_obs"])
-            item_dict["previous_obs"] = Sampler(self.transforms[0])(item_dict["previous_obs"])
-            item_dict["current_obs"] = Sampler(self.transforms[1])(item_dict["current_obs"])
-            item_dict["alternate_obs"] = Sampler(self.transforms[2])(item_dict["alternate_obs"])
+            item_dict["previous_obs"] = Sampler([self.transforms[0]])(item_dict["previous_obs"])
+            item_dict["current_obs"] = Sampler([self.transforms[1]])(item_dict["current_obs"])
+            item_dict["alternate_obs"] = Sampler([self.transforms[2]])(item_dict["alternate_obs"])
             x = [item_dict["previous_obs"], item_dict["current_obs"], item_dict["alternate_obs"]]
             y = item_dict["previous_norm_state"]
             z = [item_dict["action"], item_dict["alternate_action"]]
