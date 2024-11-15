@@ -102,6 +102,7 @@ class JointEmbeddingModel(BaseModel):
         self.log(commit=True)
 
     def initialize_metrics(self):
+        # TODO: Shreyas to add disentanglement metric here.
         nc = self.config.data.datasets[self.config.data.train_on].num_classes
 
         # Initialize the metrics dictionary with the train metric.
