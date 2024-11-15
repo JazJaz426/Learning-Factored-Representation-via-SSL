@@ -79,7 +79,7 @@ class CustomDataset(Dataset):
             state_pre, norm_state_pre = self.data_env._construct_state()
             
             #predict action and take a step in the environment
-            action, __ = self.model.predict(obs, deterministic=True)
+            action, __ = self.model.predict(obs_pre, deterministic=True)
             self.data_env.step(action)
 
             #get the future visual observation and underlying state
