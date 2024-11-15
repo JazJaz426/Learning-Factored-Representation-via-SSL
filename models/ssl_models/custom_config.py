@@ -90,8 +90,9 @@ def get_args(cfg_dict, model_class=None):
     if model_class is None:
         name = model.get("name", None)
     else:
-        if issubclass(model_class, Supervised):
-            name = "Supervised"
+        pass
+        # if issubclass(model_class, Supervised):
+        #     name = "Supervised"
     model = _MODEL_CONFIGS[name](**model)
 
     # Get the logging API type and configuration.

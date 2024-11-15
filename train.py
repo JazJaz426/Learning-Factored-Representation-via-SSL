@@ -14,14 +14,16 @@ from omegaconf import DictConfig
 
 from models.ssl_models.stable_ssl_patches import patch_stable_ssl
 from models.ssl_models.custom_config import get_args
-
-from stable_ssl.joint_embedding import SimCLR, BarlowTwins
 from stable_ssl import Supervised
+
+from models.ssl_models.custom_barlow_twins import BarlowTwins
+from models.ssl_models.factored_models import CovarianceFactorization, MaskingFactorization
+
 
 model_dict = {
     "BarlowTwins": BarlowTwins,
-    "SimCLR": SimCLR,
-    "Supervised": Supervised,
+    "CovarianceFactorization": CovarianceFactorization,
+    "MaskingFactorization": MaskingFactorization,
 }
 
 
