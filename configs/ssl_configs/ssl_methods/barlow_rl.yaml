@@ -78,18 +78,18 @@ data:
         kwargs:
           threshold: 128
           p: 0.2
-  test_out:
-    name: CustomDataset
-    data_env_config: ${local_data_path.data_env_config}
-    policy_model: null
-    model_path: null
-    limit: 10000
-    mode: cont
-    # path: ${local_data_path.cifar10_path}
-    batch_size: ${batch_size_across_gpus}
-    drop_last: False
-    num_workers: -1
-    split: test
+  # test_out:
+  #   name: CustomDataset
+  #   data_env_config: ${local_data_path.data_env_config}
+  #   policy_model: null
+  #   model_path: null
+  #   limit: 10000
+  #   mode: cont
+  #   # path: ${local_data_path.cifar10_path}
+  #   batch_size: ${batch_size_across_gpus}
+  #   drop_last: False
+  #   num_workers: -1
+  #   split: test
 
 model:
   name: BarlowTwins

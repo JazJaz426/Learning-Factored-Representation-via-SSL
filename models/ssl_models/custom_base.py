@@ -14,6 +14,7 @@ import torch
 import torch.nn.functional as F
 from torchmetrics.classification import MulticlassAccuracy
 
+import logging
 from stable_ssl.utils import load_nn, mlp, deactivate_requires_grad, update_momentum
 from stable_ssl.base import BaseModel, ModelConfig
 
@@ -50,9 +51,11 @@ class JointEmbeddingModel(BaseModel):
 
     def forward(self, x):
         self.curr_actions = x[1]
+        # logging.info(x[0].shape)
         return self.backbone_classifier(self.backbone(x[0]))  # x is tuple of observation, action
 
     def compute_loss(self):
+        # logging.info(self.data[0][0][0].shape)
         embeddings = [self.backbone(view) for view in self.data[0][0]]
         # loss_backbone = self._compute_backbone_classifier_loss(*embeddings)
 
