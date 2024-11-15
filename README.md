@@ -56,12 +56,6 @@ echo $USER
 python train.py --config-name=ssl_methods/barlow_rl.yaml user@_global_=$USER/run_slurm -m
 ```
 
-Train for testing SSL method works with CIFAR10.
-```bash
-echo $USER
-python train.py --config-name=ssl_methods/barlow_cifar10.yaml user@_global_=$USER/run_slurm
-```
-
 Run method 1
 ```bash
 echo $USER
