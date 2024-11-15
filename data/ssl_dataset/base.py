@@ -1,20 +1,23 @@
 import sys
 import os
+import logging
+from dataclasses import dataclass
+from typing import Optional
+
+from PIL import Image
+import torchvision
+import torch
+from torch.utils.data import Dataset
+
+from stable_ssl.data.augmentations import TransformsConfig
+from stable_ssl.data import base
+from stable_ssl.data.base import Sampler
 
 # Add the parent folder to sys.path
 parent_dir = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.dirname(parent_dir))
 
-import logging
-
-import torchvision
-from stable_ssl.data.augmentations import TransformsConfig
-from stable_ssl.data import base
-from stable_ssl.data.base import Sampler
-from torch.utils.data import Dataset
-from dataclasses import dataclass
 from data.dataset import CustomDataset
-from typing import Optional
 
 
 class GridworldDataset(Dataset):
@@ -41,6 +44,8 @@ class GridworldDataset(Dataset):
             y = item_dict["previous_norm_state"]
             z = item_dict["action"]
             if self.transforms is not None:
+                if not isinstance(x, Image.Image):
+                    x = Image.fromarray(x)
                 x = Sampler(self.transforms)(x)  # 1 z gets 2 or more positive views
         elif self.mode=='seq':
             """
@@ -53,14 +58,24 @@ class GridworldDataset(Dataset):
                 item_dict["action"] = action
             """
             if self.transforms is not None:
-                assert len(self.transforms) == 2
+                assert len(self.transforms) == 2, "2 views required for sequence mode"
+                if not isinstance(item_dict["previous_obs"], Image.Image):
+                    item_dict["previous_obs"] = Image.fromarray(item_dict["previous_obs"])
+                if not isinstance(item_dict["current_obs"], Image.Image):
+                    item_dict["current_obs"] = Image.fromarray(item_dict["current_obs"])
                 item_dict["previous_obs"] = Sampler(self.transforms[0])(item_dict["previous_obs"])
                 item_dict["current_obs"] = Sampler(self.transforms[1])(item_dict["current_obs"])
             x = [item_dict["previous_obs"], item_dict["current_obs"]]
             y = item_dict["previous_norm_state"]
             z = item_dict["action"]
         elif self.mode=='triplet':
-            assert len(self.transforms) == 3
+            assert len(self.transforms) == 3, "triplet mode used so 3 views required"
+            if not isinstance(item_dict["previous_obs"], Image.Image):
+                item_dict["previous_obs"] = Image.fromarray(item_dict["previous_obs"])
+            if not isinstance(item_dict["current_obs"], Image.Image):
+                item_dict["current_obs"] = Image.fromarray(item_dict["current_obs"])
+            if not isinstance(item_dict["alternate_obs"], Image.Image):
+                item_dict["alternate_obs"] = Image.fromarray(item_dict["alternate_obs"])
             item_dict["previous_obs"] = Sampler(self.transforms[0])(item_dict["previous_obs"])
             item_dict["current_obs"] = Sampler(self.transforms[1])(item_dict["current_obs"])
             item_dict["alternate_obs"] = Sampler(self.transforms[2])(item_dict["alternate_obs"])
@@ -70,6 +85,10 @@ class GridworldDataset(Dataset):
         else:
             NotImplementedError(f"{self.mode} not implemented since not implemented in the dataset generator.")
 
+        if not isinstance(y, torch.Tensor):
+            y = torch.tensor(y)
+        if not isinstance(z, torch.Tensor):
+            z = torch.tensor(z)
         return x, y, z
 
 
