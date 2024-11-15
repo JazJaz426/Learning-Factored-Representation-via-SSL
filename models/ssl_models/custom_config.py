@@ -12,18 +12,11 @@ parent_dir = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.dirname(parent_dir))
 
 from dataclasses import make_dataclass, dataclass, field
-import logging
 
 from omegaconf import OmegaConf
 
 from stable_ssl.supervised import Supervised
 from stable_ssl.base import ModelConfig
-from stable_ssl.joint_embedding import (
-    BarlowTwinsConfig,
-    SimCLRConfig,
-    VICRegConfig,
-    WMSEConfig,
-)
 
 from stable_ssl.config import (
     OptimConfig,
@@ -32,17 +25,15 @@ from stable_ssl.config import (
     WandbConfig,
 )
 
-from src.ssl_dataset.base import DataConfig
-from ssl_models.factored_models import CovarianceFactorizationConfig, MaskingFactorizationConfig
+from data.ssl_dataset.base import DataConfig
+from models.ssl_models.custom_barlow_twins import BarlowTwinsConfig
+from models.ssl_models.factored_models import CovarianceFactorizationConfig, MaskingFactorizationConfig
 
 _MODEL_CONFIGS = {
     "Supervised": ModelConfig,
-    "SimCLR": SimCLRConfig,
     "BarlowTwins": BarlowTwinsConfig,
-    "VICReg": VICRegConfig,
-    "WMSE": WMSEConfig,
-    "CovarianceFactorizationConfig": CovarianceFactorizationConfig,
-    "MaskingFactorizationConfig": MaskingFactorizationConfig,
+    "CovarianceFactorization": CovarianceFactorizationConfig,
+    "MaskingFactorization": MaskingFactorizationConfig,
 }
 
 _LOG_CONFIGS = {
@@ -99,8 +90,9 @@ def get_args(cfg_dict, model_class=None):
     if model_class is None:
         name = model.get("name", None)
     else:
-        if issubclass(model_class, Supervised):
-            name = "Supervised"
+        pass
+        # if issubclass(model_class, Supervised):
+        #     name = "Supervised"
     model = _MODEL_CONFIGS[name](**model)
 
     # Get the logging API type and configuration.

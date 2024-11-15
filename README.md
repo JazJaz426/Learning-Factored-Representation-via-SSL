@@ -43,6 +43,14 @@ pip install -e .
 
 # run ssl training script
 Train with the data generator giving data in an "online" manner.
+
+If you want to run on local machine or in an interact session:
+```bash
+echo $USER
+python train.py --config-name=ssl_methods/barlow_rl.yaml user@_global_=$USER/run_slurm
+```
+
+If you want to run as a sbatch script sent to SLURM:
 ```bash
 echo $USER
 python train.py --config-name=ssl_methods/barlow_rl.yaml user@_global_=$USER/run_slurm -m
@@ -51,5 +59,17 @@ python train.py --config-name=ssl_methods/barlow_rl.yaml user@_global_=$USER/run
 Train for testing SSL method works with CIFAR10.
 ```bash
 echo $USER
-python train.py --config-name=ssl_methods/barlow_cifar10.yaml user@_global_=$USER/run_slurm -m
+python train.py --config-name=ssl_methods/barlow_cifar10.yaml user@_global_=$USER/run_slurm
+```
+
+Run method 1
+```bash
+echo $USER
+python train.py --config-name=ssl_methods/covariance_factor.yaml user@_global_=$USER/run_slurm
+```
+
+Run method 2
+```bash
+echo $USER
+python train.py --config-name=ssl_methods/mask_factor.yaml user@_global_=$USER/run_slurm
 ```
