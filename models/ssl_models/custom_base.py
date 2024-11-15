@@ -12,6 +12,7 @@ from abc import abstractmethod
 from dataclasses import dataclass, field
 import torch
 import torch.nn.functional as F
+from torchmetrics.classification import MulticlassAccuracy
 
 from stable_ssl.utils import load_nn, mlp, deactivate_requires_grad, update_momentum
 from stable_ssl.base import BaseModel, ModelConfig
@@ -99,6 +100,36 @@ class JointEmbeddingModel(BaseModel):
             elif name.startswith(f"eval/step/{name_loader}/"):
                 self.log({name: metric(output, self.data[1])}, commit=False)
         self.log(commit=True)
+
+    def initialize_metrics(self):
+        nc = self.config.data.datasets[self.config.data.train_on].num_classes
+
+        # Initialize the metrics dictionary with the train metric.
+        self.metrics = torch.nn.ModuleDict(
+            {"train/acc1": MulticlassAccuracy(num_classes=nc, top_k=1)}
+        )
+
+        # Add unique evaluation metrics for each eval dataset.
+        name_eval_loaders = set(self.dataloaders.keys()) - set(
+            [self.config.data.train_on]
+        )
+        for name_loader in name_eval_loaders:
+            self.metrics.update(
+                {
+                    f"eval/{name_loader}/acc1": MulticlassAccuracy(
+                        num_classes=nc, top_k=1
+                    ),
+                    f"eval/{name_loader}/acc5": MulticlassAccuracy(
+                        num_classes=nc, top_k=5
+                    ),
+                    f"eval/{name_loader}/acc1_by_class": MulticlassAccuracy(
+                        num_classes=nc, average="none", top_k=1
+                    ),
+                    f"eval/{name_loader}/acc5_by_class": MulticlassAccuracy(
+                        num_classes=nc, average="none", top_k=5
+                    ),
+                }
+            )
 
 
 @dataclass
