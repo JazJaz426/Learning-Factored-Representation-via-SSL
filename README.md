@@ -61,3 +61,15 @@ Train for testing SSL method works with CIFAR10.
 echo $USER
 python train.py --config-name=ssl_methods/barlow_cifar10.yaml user@_global_=$USER/run_slurm
 ```
+
+Run method 1
+```bash
+echo $USER
+python train.py --config-name=ssl_methods/covariance_factor.yaml user@_global_=$USER/run_slurm
+```
+
+Run method 2
+```bash
+echo $USER
+python train.py --config-name=ssl_methods/mask_factor.yaml user@_global_=$USER/run_slurm
+```
