@@ -25,7 +25,7 @@ class CustomDataset(Dataset):
         self.count = 0
         self.limit = limit
         self.mode = mode #options: seq [sequential], cont [controlled factors], triplet [triplet pair with different actions], rand [random reset, inbuilt], step [returns s1, s2, a as state pair]
-        self.classes = list(range(1000))
+        self.classes = list(range(12))
 
         #policy model used for data generation: load from checkpoint path if needed
         if policy_model is not None:

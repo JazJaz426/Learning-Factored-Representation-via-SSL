@@ -8,14 +8,19 @@
 from dataclasses import dataclass
 import torch
 
-from stable_ssl.joint_embedding.base import JointEmbeddingConfig, JointEmbeddingModel
 from stable_ssl.utils import off_diagonal, gather_processes
 import logging
 from dataclasses import dataclass, field
 import torch
 
 from stable_ssl.utils import mlp
-from stable_ssl.joint_embedding.base import SelfDistillationModel, SelfDistillationConfig
+
+from models.ssl_models.custom_base import JointEmbeddingConfig, JointEmbeddingModel
+from models.ssl_models.custom_base import SelfDistillationModel, SelfDistillationConfig
+import torch.nn.functional as F
+
+from stable_ssl.utils import load_nn, mlp, deactivate_requires_grad, update_momentum
+from stable_ssl.base import BaseModel, ModelConfig
 
 
 # CovarianceFactorization method 1
@@ -30,11 +35,61 @@ class CovarianceFactorization(JointEmbeddingModel):
     """
 
     def initialize_modules(self):
-        super().initialize_modules()
         self.bn = torch.nn.BatchNorm1d(self.config.model.projector[-1])
+        backbone, fan_in = load_nn(
+            backbone_model=self.config.model.backbone_model,
+            pretrained=False,
+            dataset=self.config.data.train_dataset.name,
+        )
+        self.backbone = backbone.train()
+
+        sizes = [fan_in] + self.config.model.projector
+        self.projector = mlp(sizes)
+
+        self.backbone_classifier = torch.nn.Linear(
+            fan_in, self.config.data.train_dataset.num_classes
+        )
+        self.projector_classifier = torch.nn.Linear(
+            self.config.model.projector[-1],
+            self.config.data.train_dataset.num_classes,
+        )
+        self.curr_actions = None
+        # the g_theta function in the architecture
+        self.world_model = torch.nn.Linear(
+            fan_in+1, fan_in
+        )
+
+    def forward(self, x):
+        self.curr_actions = x[1]
+        return self.backbone_classifier(self.backbone(x[0]))  # x is tuple of observation, action
+
+    def compute_loss(self):
+        embeddings = [self.backbone(view) for view in self.data[0][0]]
+        reconstruction = [self.world_model(torch.cat([embeddings[0], self.curr_actions], dim=1))]  # append a_i to z_i and pass to world model
+        # loss_backbone = self._compute_backbone_classifier_loss(*embeddings)
+
+        projections = [self.projector(embed) for embed in embeddings]
+        # loss_proj = self._compute_projector_classifier_loss(*projections)
+        loss_ssl = self.compute_ssl_loss(projections[0], projections[1], reconstruction[0])
+
+        if self.global_step % self.config.log.log_every_step == 0:
+            self.log(
+                {
+                    "train/loss_ssl": loss_ssl.item(),
+                    # "train/loss_backbone_classifier": loss_backbone.item(),
+                    # "train/loss_projector_classifier": loss_proj.item(),
+                },
+                commit=False,
+            )
+
+        return loss_ssl # + loss_proj + loss_backbone
+
+    def forward(self, x):
+        self.curr_actions = x[1]
+        return self.backbone_classifier(self.backbone(x[0]))  # x is tuple of observation, action
 
     @gather_processes
-    def compute_ssl_loss(self, z_i, z_j):
+    def compute_ssl_loss(self, z_i, z_j, z_j_reconstruction):
         # Empirical cross-correlation matrix.
         c = self.bn(z_i).T @ self.bn(z_j)
 
@@ -45,6 +100,10 @@ class CovarianceFactorization(JointEmbeddingModel):
         on_diag = torch.diagonal(c).add_(-1).pow_(2).sum()
         off_diag = off_diagonal(c).pow_(2).sum()
         loss = on_diag + self.config.model.lambd * off_diag
+        
+        # Reconstruction loss
+        reconstruction_loss = F.mse_loss(z_j_reconstruction, z_j)
+        loss += reconstruction_loss
         return loss
 
 
@@ -62,6 +121,7 @@ class CovarianceFactorizationConfig(JointEmbeddingConfig):
 
     def trainer(self):
         return CovarianceFactorization
+
 
 # MaskingFactorizationConfig
 """MaskingFactorization model which is a modification of BYOL model."""

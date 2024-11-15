@@ -67,7 +67,7 @@ class GridworldDataset(Dataset):
                 item_dict["current_obs"] = Sampler(self.transforms[1])(item_dict["current_obs"])
             x = [item_dict["previous_obs"], item_dict["current_obs"]]
             y = item_dict["previous_norm_state"]
-            z = item_dict["action"]
+            z = [item_dict["action"]]
         elif self.mode=='triplet':
             assert len(self.transforms) == 3, "triplet mode used so 3 views required"
             if not isinstance(item_dict["previous_obs"], Image.Image):
@@ -89,7 +89,9 @@ class GridworldDataset(Dataset):
             y = torch.tensor(y)
         if not isinstance(z, torch.Tensor):
             z = torch.tensor(z)
-        return x, y, z
+        x = (x,z)
+        # print(x[0][0].shape, z.shape, z, y.shape)
+        return x, y
 
 
 @dataclass
