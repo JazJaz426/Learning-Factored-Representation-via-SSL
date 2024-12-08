@@ -110,6 +110,7 @@ hardware:
   world_size: 1
 
 log:
+  eval_only: True
   save_final_model: true
   eval_every_epoch: 20
   log_every_step: 150

@@ -3,7 +3,6 @@
 import numpy as np
 from sklearn.preprocessing import minmax_scale
 from pyitlib import discrete_random_variable as drv
-import sklearn
 
 def get_bin_index(x, nb_bins):
     ''' Discretize input variable

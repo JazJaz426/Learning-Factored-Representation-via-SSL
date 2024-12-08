@@ -1,7 +1,13 @@
-from frob_norm_diff_identity import frob_norm_diff_identity
-from z_min_var import z_min_var
-from mutual_info import mig
-import wandb
+import sys
+import os
+
+# Add the parent folder to sys.path
+parent_dir = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, os.path.dirname(parent_dir))
+
+from .frob_norm_diff_identity import frob_norm_diff_identity
+from .z_min_var import z_min_var
+from .mutual_info import mig
 import torch
 from torchmetrics import Metric
 

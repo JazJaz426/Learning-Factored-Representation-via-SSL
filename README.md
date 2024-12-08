@@ -67,3 +67,5 @@ Run method 2
 echo $USER
 python train.py --config-name=ssl_methods/mask_factor.yaml user@_global_=$USER/run_slurm
 ```
+
+python train.py --config-name=ssl_methods/barlow_rl_eval.yaml user@_global_=$USER/run_slurm
