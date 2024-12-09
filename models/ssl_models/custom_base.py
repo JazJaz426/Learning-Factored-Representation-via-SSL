@@ -53,7 +53,7 @@ class JointEmbeddingModel(BaseModel):
 
     def forward(self, x):
         self.curr_actions = x[1]
-        logging.info(x[0].shape)
+        # logging.info(f"inside forward after indexing: {x[0].shape}")
         return self.backbone_classifier(self.backbone(x[0]))  # x is tuple of observation, action
 
     def compute_loss(self):
@@ -98,8 +98,8 @@ class JointEmbeddingModel(BaseModel):
         return sum(losses)
 
     def eval_step(self, name_loader):
-        logging.info(self.data[0][0].shape)
-        output = self.forward(self.data[0][0])  # x is tuple of observations, action so we need to index the observation
+        # logging.info(f"outside of the forward call: {self.data[0][0].shape}")
+        output = self.forward(self.data[0])  # x is tuple of observations, action
         for name, metric in self.metrics.items():
             if name.startswith(f"eval/epoch/{name_loader}/"):
                 metric.update(output, self.data[1])

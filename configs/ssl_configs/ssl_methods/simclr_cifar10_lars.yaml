@@ -84,6 +84,7 @@ model:
   backbone_model: resnet50
   projector: 2048-128
   temperature: 0.5
+  sync_batchnorm: false
 
 optim:
   epochs: 1000
