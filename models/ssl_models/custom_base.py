@@ -14,6 +14,7 @@ import torch
 import torch.nn.functional as F
 from torchmetrics.classification import MulticlassAccuracy
 
+import logging
 from disentanglement_metrics.disentangelement_callback import FrobeniusNorm, ZMinVar, MutualInformationGap
 
 from stable_ssl.utils import load_nn, mlp, deactivate_requires_grad, update_momentum
@@ -52,9 +53,11 @@ class JointEmbeddingModel(BaseModel):
 
     def forward(self, x):
         self.curr_actions = x[1]
+        # logging.info(f"inside forward after indexing: {x[0].shape}")
         return self.backbone_classifier(self.backbone(x[0]))  # x is tuple of observation, action
 
     def compute_loss(self):
+        # logging.info(self.data[0][0][0].shape)
         embeddings = [self.backbone(view) for view in self.data[0][0]]
         # loss_backbone = self._compute_backbone_classifier_loss(*embeddings)
 
@@ -95,7 +98,8 @@ class JointEmbeddingModel(BaseModel):
         return sum(losses)
 
     def eval_step(self, name_loader):
-        output = self.forward(self.data[0][0])  # x is tuple of observations, action so we need to index the observation
+        # logging.info(f"outside of the forward call: {self.data[0][0].shape}")
+        output = self.forward(self.data[0])  # x is tuple of observations, action
         for name, metric in self.metrics.items():
             if name.startswith(f"eval/epoch/{name_loader}/"):
                 metric.update(output, self.data[1])

@@ -24,7 +24,7 @@ data:
     limit: 50000
     policy_model: null
     model_path: null
-    mode: seq
+    mode: cont
     # path: ${local_data_path.cifar10_path}
     batch_size: ${batch_size_across_gpus}
     drop_last: True
@@ -84,7 +84,7 @@ data:
     policy_model: null
     model_path: null
     limit: 10000
-    mode: seq
+    mode: cont
     # path: ${local_data_path.cifar10_path}
     batch_size: ${batch_size_across_gpus}
     drop_last: False
@@ -92,7 +92,7 @@ data:
     split: test
 
 model:
-  name: CovarianceFactorization
+  name: BarlowTwins
   backbone_model: resnet50
   projector: 2048-128
   lambd: 0.1
@@ -111,6 +111,7 @@ hardware:
   world_size: 1
 
 log:
+  eval_only: True
   save_final_model: true
   eval_every_epoch: 20
   log_every_step: 150

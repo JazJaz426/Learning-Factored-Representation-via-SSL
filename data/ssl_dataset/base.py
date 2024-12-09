@@ -91,7 +91,7 @@ class GridworldDataset(Dataset):
             y = torch.tensor(y)
         if not isinstance(z, torch.Tensor):
             z = torch.tensor(z)
-        x = (x,z)
+        x = (x,z) # tuple of observation, action
         # print(x[0][0].shape, z.shape, z, y.shape)
         return x, y
 
