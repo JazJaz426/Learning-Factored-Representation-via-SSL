@@ -85,6 +85,7 @@ model:
   projector: 2048-128
   temperature: 0.5
   sync_batchnorm: false
+  memory_format: contiguous_format
 
 optim:
   epochs: 1000

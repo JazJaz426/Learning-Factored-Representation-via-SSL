@@ -27,7 +27,7 @@ class FrobeniusNorm(Metric):
         '''
 
         #compute the Frobenius Norm metric 
-        frob_norm = frob_norm_diff_identity(preds.detach().numpy())
+        frob_norm = frob_norm_diff_identity(preds.detach().cpu().numpy())
 
         #increment total Frobenius norm and total to get avg frobenius norm across batch/count
         self.total_frob_norm += frob_norm
@@ -53,7 +53,7 @@ class ZMinVar(Metric):
         '''
 
         #compute the Frobenius Norm metric 
-        var_val = z_min_var(factors= target.detach().numpy(), codes= preds.detach().numpy())
+        var_val = z_min_var(factors= target.detach().cpu().numpy(), codes= preds.detach().cpu().numpy())
 
         #increment total Frobenius norm and total to get avg frobenius norm across batch/count
         self.total_z_min_var += var_val
@@ -81,7 +81,7 @@ class MutualInformationGap(Metric):
         '''
 
         #compute the Frobenius Norm metric 
-        mig_val = mig(factors= target.detach().numpy(), codes= preds.detach().numpy())
+        mig_val = mig(factors= target.detach().cpu().numpy(), codes= preds.detach().cpu().numpy())
 
         #increment total Frobenius norm and total to get avg frobenius norm across batch/count
         self.total_mig += mig_val

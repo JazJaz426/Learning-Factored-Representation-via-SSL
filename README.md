@@ -55,6 +55,8 @@ source .venv/bin/activate
 pip install -e .
 ```
 
+> **Caution**: You will need to create user specific configs for $USER run command to work. Create them here: `configs/ssl_configs/user/$USER`.
+
 # run ssl training script
 ```bash
 source .venv/bin/activate
@@ -92,3 +94,12 @@ Run train+eval for debugging
 ```bash
 python train.py --config-name=ssl_methods/barlow_rl.yaml user@_global_=$USER/run_debug -m
 ```
+
+# Interpreting the labels for the RL dataset:
+* The state or the normalized state information is label.
+* Example: 
+```bash
+{'agent_dir': np.int64(1), 'agent_pos': (np.int64(4), np.int64(6)), 'door_locked': 0, 'door_open': 0, 'door_pos': (np.int64(2), np.int64(3)), 'goal_pos': (np.int64(3), np.int64(3)), 'holding_key': 0, 'key_pos': (np.int64(4), np.int64(4))} 
+[np.float64(0.3333333333333333), np.float64(0.5), np.float64(0.75), np.float64(0.0), np.float64(0.0), np.float64(0.25), np.float64(0.375), np.float64(0.375), np.float64(0.375), np.float64(0.0), np.float64(0.5), np.float64(0.5)]
+```
+* Each value in the state is normalized by [value - min(0 here)/[max(8 here) - min(0 here)]]

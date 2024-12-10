@@ -324,7 +324,15 @@ class DataGenerator(gym.Env):
                 state[attr] = int(self.env.unwrapped.grid.grid[np.where(types=='door')[0][0]].is_open)
 
 
-        norm_state_array = np.array([item for key in sorted(state.keys()) for item in (state[key] if isinstance(state[key], tuple) else [state[key]])])
+        norm_state_array = np.array(
+                [
+                    item \
+                    for key in sorted(state.keys()) \
+                    for item in (
+                        state[key] if isinstance(state[key], tuple) else [state[key]]
+                        )
+                ]
+            )
 
         min_values = np.array(self.expert_observation_space.low)
         max_values = np.array(self.expert_observation_space.high)

@@ -42,6 +42,7 @@ class GridworldDataset(Dataset):
             """
             x = item_dict["previous_obs"]
             y = item_dict["previous_norm_state"]
+            # print(item_dict["previous_state"], item_dict["previous_norm_state"])
             z = item_dict["action"]
 
             
@@ -69,6 +70,7 @@ class GridworldDataset(Dataset):
                 item_dict["current_obs"] = Sampler([self.transforms[1]])(item_dict["current_obs"])
             x = [item_dict["previous_obs"], item_dict["current_obs"]]
             y = item_dict["previous_norm_state"]
+            # print(item_dict["previous_state"], item_dict["previous_norm_state"])
             z = [item_dict["action"]]
         elif self.mode=='triplet':
             assert len(self.transforms) == 3, "triplet mode used so 3 views required"
@@ -91,8 +93,7 @@ class GridworldDataset(Dataset):
             y = torch.tensor(y)
         if not isinstance(z, torch.Tensor):
             z = torch.tensor(z)
-        x = (x,z) # tuple of observation, action
-        # print(x[0][0].shape, z.shape, z, y.shape)
+        x = (x, z) # tuple of observation, action
         return x, y
 
 

@@ -87,6 +87,7 @@ model:
   projector: 2048-128
   lambd: 0.1
   sync_batchnorm: false
+  memory_format: contiguous_format
 
 optim:
   epochs: 1000
