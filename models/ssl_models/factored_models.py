@@ -39,20 +39,22 @@ class CovarianceFactorization(JointEmbeddingModel):
         sizes = [fan_in] + self.config.model.projector
         self.projector = mlp(sizes)
 
-        self.backbone_classifier = torch.nn.Linear(
-            fan_in, self.config.data.train_dataset.num_classes
+        self.backbone_classifier = torch.nn.Sequential(
+            torch.nn.Linear(fan_in, self.config.data.train_dataset.num_classes),
+            torch.nn.Sigmoid(),
         )
         self.projector_classifier = torch.nn.Linear(
             self.config.model.projector[-1],
             self.config.data.train_dataset.num_classes,
         )
         # the g_theta function in the architecture
-        self.world_model = torch.nn.Linear(
-            self.config.model.projector[-1]+1, self.config.model.projector[-1]
+        self.world_model = torch.nn.Sequential(
+            torch.nn.Linear(self.config.model.projector[-1]+1,
+                            256),
+            torch.nn.ReLU(),
+            torch.nn.Linear(256, self.config.model.projector[-1]),
+            torch.nn.Sigmoid(),
         )
-
-    def forward(self, x):
-        return self.backbone_classifier(self.backbone(x[0]))  # x is tuple of observation, action
 
     def compute_loss(self):
         embeddings = [self.backbone(view) for view in self.data[0][0]]
