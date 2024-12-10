@@ -1,10 +1,3 @@
-###
-# This code is a modification of Stable-SSL code done by the below authors. They own the original implementation.
-"""SSL Methods which help with disentanglement or learning factorized latent space"""
-#
-# Original Author: Randall Balestriero
-#                  Hugues Van Assel
-
 from dataclasses import dataclass
 import torch
 

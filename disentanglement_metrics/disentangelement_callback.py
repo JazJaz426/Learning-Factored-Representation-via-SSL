@@ -15,8 +15,8 @@ class FrobeniusNorm(Metric):
     def __init__(self):
         super().__init__()
         # Initialize metric state variables
-        self.add_state("total_frob_norm", default=torch.tensor(0), dist_reduce_fx="sum")
-        self.add_state("total", default=torch.tensor(0), dist_reduce_fx="sum")
+        self.add_state("total_frob_norm", default=torch.tensor(0.0), dist_reduce_fx="sum")
+        self.add_state("total", default=torch.tensor(0.0), dist_reduce_fx="sum")
        
 
     def update(self, preds: torch.Tensor, target: torch.Tensor):
@@ -41,8 +41,8 @@ class ZMinVar(Metric):
     def __init__(self):
         super().__init__()
         # Initialize metric state variables
-        self.add_state("total_z_min_var", default=torch.tensor(0), dist_reduce_fx="sum")
-        self.add_state("total", default=torch.tensor(0), dist_reduce_fx="sum")
+        self.add_state("total_z_min_var", default=torch.tensor(0.0), dist_reduce_fx="sum")
+        self.add_state("total", default=torch.tensor(0.0), dist_reduce_fx="sum")
        
 
     def update(self, preds: torch.Tensor, target: torch.Tensor):
@@ -53,7 +53,14 @@ class ZMinVar(Metric):
         '''
 
         #compute the Frobenius Norm metric 
-        var_val = z_min_var(factors= target.detach().cpu().numpy(), codes= preds.detach().cpu().numpy())
+        train_size = int(0.8*target.shape[-1])
+        test_size = target.shape[-1] - train_size
+        var_val = z_min_var(
+            factors=target.detach().cpu().numpy(),
+            codes=preds.detach().cpu().numpy(),
+            nb_training=train_size,
+            nb_eval=test_size
+        )
 
         #increment total Frobenius norm and total to get avg frobenius norm across batch/count
         self.total_z_min_var += var_val
@@ -69,8 +76,8 @@ class MutualInformationGap(Metric):
     def __init__(self):
         super().__init__()
         # Initialize metric state variables
-        self.add_state("total_mig", default=torch.tensor(0), dist_reduce_fx="sum")
-        self.add_state("total", default=torch.tensor(0), dist_reduce_fx="sum")
+        self.add_state("total_mig", default=torch.tensor(0.0), dist_reduce_fx="sum")
+        self.add_state("total", default=torch.tensor(0.0), dist_reduce_fx="sum")
        
 
     def update(self, preds: torch.Tensor, target: torch.Tensor):
