@@ -100,12 +100,11 @@ class JointEmbeddingModel(BaseModel):
         self.log(commit=True)
 
     def initialize_metrics(self):
-        # TODO: Issue #24 https://github.com/JazJaz426/Learning-Factored-Representation-via-SSL/issues/24
         nc = self.config.data.datasets[self.config.data.train_on].num_classes
 
         # Initialize the metrics dictionary with the train metric.
         self.metrics = torch.nn.ModuleDict(
-            {"train/step/acc1": MeanSquaredError(num_outputs=nc)}
+            {"train/step/mse": MeanSquaredError(num_outputs=nc)}
         )
 
         # Add unique evaluation metrics for each eval dataset.
@@ -115,8 +114,8 @@ class JointEmbeddingModel(BaseModel):
         for name_loader in name_eval_loaders:
             self.metrics.update(
                 {
-                    f"eval/step/{name_loader}/multilabel_acc": MeanSquaredError(num_outputs=nc),
-                    f"eval/epoch/{name_loader}/multilabel_acc": MeanSquaredError(num_outputs=nc),
+                    f"eval/step/{name_loader}/mse": MeanSquaredError(num_outputs=nc),
+                    f"eval/epoch/{name_loader}/mse": MeanSquaredError(num_outputs=nc),
                     f"eval/epoch/{name_loader}/forb_norm": FrobeniusNorm(),
                     # f"eval/epoch/{name_loader}/z_min_var": ZMinVar(),
                     # f"eval/epoch/{name_loader}/mig": MutualInformationGap(),

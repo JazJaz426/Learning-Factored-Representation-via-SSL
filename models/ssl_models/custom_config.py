@@ -15,7 +15,6 @@ from dataclasses import make_dataclass, dataclass, field
 
 from omegaconf import OmegaConf
 
-from stable_ssl.supervised import Supervised
 from stable_ssl.base import ModelConfig
 
 from stable_ssl.config import (
@@ -26,11 +25,12 @@ from stable_ssl.config import (
 )
 
 from data.ssl_dataset.base import DataConfig
+from models.ssl_models.custom_supervised import SupervisedConfig
 from models.ssl_models.custom_barlow_twins import BarlowTwinsConfig
 from models.ssl_models.factored_models import CovarianceFactorizationConfig, MaskingFactorizationConfig
 
 _MODEL_CONFIGS = {
-    "Supervised": ModelConfig,
+    "Supervised": SupervisedConfig,
     "BarlowTwins": BarlowTwinsConfig,
     "CovarianceFactorization": CovarianceFactorizationConfig,
     "MaskingFactorization": MaskingFactorizationConfig,
