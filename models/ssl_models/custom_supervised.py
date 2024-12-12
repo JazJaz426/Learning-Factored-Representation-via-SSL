@@ -1,15 +1,19 @@
-import copy
-from abc import abstractmethod
-from dataclasses import dataclass, field
+import sys
+import os
+
+# Add the parent folder to sys.path
+parent_dir = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, os.path.dirname(parent_dir))
+
+from dataclasses import dataclass
 import torch
 import torch.nn.functional as F
 from torchmetrics.regression import MeanSquaredError
 
-import logging
-from disentanglement_metrics.disentangelement_callback import FrobeniusNorm, ZMinVar, MutualInformationGap
-
-from stable_ssl.utils import load_nn
 from stable_ssl.base import BaseModel, ModelConfig
+
+from disentanglement_metrics.disentangelement_callback import FrobeniusNorm
+from models.ssl_models.create_nn import load_nn
 
 
 class Supervised(BaseModel):
