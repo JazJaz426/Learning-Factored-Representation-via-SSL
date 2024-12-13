@@ -109,7 +109,7 @@ data:
     policy_model: null
     model_path: null
     limit: 10000
-    mode: triplet
+    mode: cont
     # path: ${local_data_path.cifar10_path}
     batch_size: ${batch_size_across_gpus}
     drop_last: False
