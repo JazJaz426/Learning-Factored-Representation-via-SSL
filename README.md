@@ -60,7 +60,7 @@ pip install -e .
 # run ssl training script
 ```bash
 source .venv/bin/activate
-echo $USER
+echo $USER # or use export USER=general for user-agnostic environment
 ```
 
 Train with the data generator which does rollout but doesn't update policy, i.e., offline RL.
