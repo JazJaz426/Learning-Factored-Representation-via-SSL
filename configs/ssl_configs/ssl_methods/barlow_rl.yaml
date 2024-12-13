@@ -90,6 +90,9 @@ data:
     drop_last: False
     num_workers: -1
     split: test
+    transforms:
+      view1:
+      - name: Identity
 
 model:
   name: BarlowTwins
