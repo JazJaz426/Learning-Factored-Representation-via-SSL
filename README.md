@@ -113,19 +113,29 @@ python train.py --config-name=ssl_methods/barlow_rl.yaml user@_global_=$USER/run
   * A Barlow Twins model.
   * Our proposed SSL learning algorithm which uses the current state's image and the next state's image along with the action taken based on a random policy (100% exploration).
   * Models are trained for 250 epochs/till convergence.
-* Experiment commands:
+
+# Experiment commands:
+* Supervised:
 ```bash
-python train.py --config-name=ssl_methods/covariance_factor_natureCNN.yaml user@_global_=$USER/run_slurm -m ++optim.epochs=250 ++hardware.seed=0 ++data.base.limit=900000 ++data.test_out.limit=100000
-python train.py --config-name=ssl_methods/covariance_factor_natureCNN.yaml user@_global_=$USER/run_slurm -m ++optim.epochs=250 ++hardware.seed=0 ++data.base.limit=1800000 ++data.test_out.limit=200000
-python train.py --config-name=ssl_methods/covariance_factor_natureCNN.yaml user@_global_=$USER/run_slurm -m ++optim.epochs=250 ++hardware.seed=0 ++data.base.limit=2700000 ++data.test_out.limit=300000
+python train.py --config-name=ssl_methods/supervised_rl.yaml user@_global_=$USER/run_slurm -m ++optim.epochs=250 ++hardware.seed=0 ++data.base.limit=900000 ++data.test_out.limit=100000
+python train.py --config-name=ssl_methods/supervised_rl.yaml user@_global_=$USER/run_slurm -m ++optim.epochs=250 ++hardware.seed=0 ++data.base.limit=1800000 ++data.test_out.limit=200000
+python train.py --config-name=ssl_methods/supervised_rl.yaml user@_global_=$USER/run_slurm -m ++optim.epochs=250 ++hardware.seed=0 ++data.base.limit=2700000 ++data.test_out.limit=300000
 ```
+* Barlow Twins:
 ```bash
-python train.py --config-name=ssl_methods/barlow_rl_natureCNN.yaml user@_global_=$USER/run_slurm -m ++optim.epochs=250 ++hardware.seed=0 ++data.base.limit=900000 ++data.test_out.limit=100000
-python train.py --config-name=ssl_methods/barlow_rl_natureCNN.yaml user@_global_=$USER/run_slurm -m ++optim.epochs=250 ++hardware.seed=0 ++data.base.limit=1800000 ++data.test_out.limit=200000
-python train.py --config-name=ssl_methods/barlow_rl_natureCNN.yaml user@_global_=$USER/run_slurm -m ++optim.epochs=250 ++hardware.seed=0 ++data.base.limit=2700000 ++data.test_out.limit=300000
+python train.py --config-name=ssl_methods/barlow_rl.yaml user@_global_=$USER/run_slurm -m ++optim.epochs=250 ++hardware.seed=0 ++data.base.limit=900000 ++data.test_out.limit=100000
+python train.py --config-name=ssl_methods/barlow_rl.yaml user@_global_=$USER/run_slurm -m ++optim.epochs=250 ++hardware.seed=0 ++data.base.limit=1800000 ++data.test_out.limit=200000
+python train.py --config-name=ssl_methods/barlow_rl.yaml user@_global_=$USER/run_slurm -m ++optim.epochs=250 ++hardware.seed=0 ++data.base.limit=2700000 ++data.test_out.limit=300000
 ```
+* Covariance Reduction Method for Factorization:
 ```bash
-python train.py --config-name=ssl_methods/mask_factor_natureCNN.yaml user@_global_=$USER/run_slurm -m ++optim.epochs=250 ++hardware.seed=0 ++data.base.limit=900000 ++data.test_out.limit=100000
-python train.py --config-name=ssl_methods/mask_factor_natureCNN.yaml user@_global_=$USER/run_slurm -m ++optim.epochs=250 ++hardware.seed=0 ++data.base.limit=1800000 ++data.test_out.limit=200000
-python train.py --config-name=ssl_methods/mask_factor_natureCNN.yaml user@_global_=$USER/run_slurm -m ++optim.epochs=250 ++hardware.seed=0 ++data.base.limit=2700000 ++data.test_out.limit=300000
+python train.py --config-name=ssl_methods/covariance_factor.yaml user@_global_=$USER/run_slurm -m ++optim.epochs=250 ++hardware.seed=0 ++data.base.limit=900000 ++data.test_out.limit=100000
+python train.py --config-name=ssl_methods/covariance_factor.yaml user@_global_=$USER/run_slurm -m ++optim.epochs=250 ++hardware.seed=0 ++data.base.limit=1800000 ++data.test_out.limit=200000
+python train.py --config-name=ssl_methods/covariance_factor.yaml user@_global_=$USER/run_slurm -m ++optim.epochs=250 ++hardware.seed=0 ++data.base.limit=2700000 ++data.test_out.limit=300000
+```
+* Masked Factorization:
+```bash
+python train.py --config-name=ssl_methods/mask_factor.yaml user@_global_=$USER/run_slurm -m ++optim.epochs=250 ++hardware.seed=0 ++data.base.limit=900000 ++data.test_out.limit=100000
+python train.py --config-name=ssl_methods/mask_factor.yaml user@_global_=$USER/run_slurm -m ++optim.epochs=250 ++hardware.seed=0 ++data.base.limit=1800000 ++data.test_out.limit=200000
+python train.py --config-name=ssl_methods/mask_factor.yaml user@_global_=$USER/run_slurm -m ++optim.epochs=250 ++hardware.seed=0 ++data.base.limit=2700000 ++data.test_out.limit=300000
 ```
