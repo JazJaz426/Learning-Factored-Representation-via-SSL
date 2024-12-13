@@ -51,9 +51,12 @@ class CovarianceFactorization(JointEmbeddingModel):
             torch.nn.Linear(fan_in, self.config.data.train_dataset.num_classes),
             torch.nn.Sigmoid(),
         )
-        self.projector_classifier = torch.nn.Linear(
-            self.config.model.projector[-1],
-            self.config.data.train_dataset.num_classes,
+        self.projector_classifier = torch.nn.Sequential(
+            torch.nn.Linear(
+                self.config.model.projector[-1],
+                self.config.data.train_dataset.num_classes,
+            ),
+            torch.nn.Sigmoid(),
         )
         # the g_theta function in the architecture
         self.world_model = torch.nn.Sequential(
@@ -66,24 +69,26 @@ class CovarianceFactorization(JointEmbeddingModel):
 
     def compute_loss(self):
         embeddings = [self.backbone(view) for view in self.data[0][0]]
-        # loss_backbone = self._compute_backbone_classifier_loss(*embeddings)
+        loss_backbone = self._compute_backbone_classifier_loss(*embeddings)
 
         projections = [self.projector(embed) for embed in embeddings]
+        loss_proj = self._compute_projector_classifier_loss(*projections)
+
         reconstruction = [self.world_model(torch.cat((projections[0], self.data[0][1]), dim=1))]  # append a_i to z_i and pass to world model
-        # loss_proj = self._compute_projector_classifier_loss(*projections)
+
         loss_ssl = self.compute_ssl_loss(projections[0], projections[1], reconstruction[0])
 
-        # if self.global_step % self.config.log.log_every_step == 0:
-        #     self.log(
-        #         {
-        #             "train/loss_ssl": loss_ssl.item(),
-        #             # "train/loss_backbone_classifier": loss_backbone.item(),
-        #             # "train/loss_projector_classifier": loss_proj.item(),
-        #         },
-        #         commit=False,
-        #     )
+        if self.global_step % self.config.log.log_every_step == 0:
+            self.log(
+                {
+                    "train/loss_ssl": loss_ssl.item(),
+                    "train/loss_backbone_classifier": loss_backbone.item(),
+                    "train/loss_projector_classifier": loss_proj.item(),
+                },
+                commit=False,
+            )
 
-        return loss_ssl # + loss_proj + loss_backbone
+        return loss_ssl + loss_proj + loss_backbone
 
     def forward(self, x):
         self.curr_actions = x[1]
@@ -111,7 +116,7 @@ class CovarianceFactorization(JointEmbeddingModel):
                 },
                 commit=False,
             )
-        loss += reconstruction_loss
+        loss += 10.0*reconstruction_loss
         return loss
 
 
