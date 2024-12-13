@@ -15,6 +15,7 @@ from stable_ssl.base import BaseModel, ModelConfig
 from disentanglement_metrics.disentangelement_callback import FrobeniusNorm
 from models.ssl_models.create_nn import load_nn
 
+import logging
 
 class Supervised(BaseModel):
     r"""Base class for training a supervised model.
@@ -43,13 +44,16 @@ class Supervised(BaseModel):
     def forward(self, x):
         self.curr_actions = x[1]
         # logging.info(f"inside forward after indexing: {x[0].shape}")
+        # logging.info(f"inside forward before pass: {x[0].dtype}")
         return self.backbone_classifier(self.backbone(x[0]))  # x is tuple of observation, action
 
     def compute_loss(self):
         # data is (x,y) so data[0] will be x since tuple indexing. Now data[0] is (observation, action)
         predictions = self.forward(self.data[0])
-        loss = F.mse_loss(predictions, self.data[1])
-
+        # logging.info(f"predictions: {predictions.dtype}")
+        # logging.info(f"true labels: {self.data[1].dtype}")
+        loss = F.mse_loss(predictions, self.data[1].float())
+        # logging.info(f"loss: {loss.dtype}")
         if self.global_step % self.config.log.log_every_step == 0:
             self.log(
                 {

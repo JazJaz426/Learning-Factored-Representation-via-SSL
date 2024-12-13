@@ -8,8 +8,9 @@ from torchmetrics.regression import MeanSquaredError
 import logging
 from disentanglement_metrics.disentangelement_callback import FrobeniusNorm, ZMinVar, MutualInformationGap
 
-from stable_ssl.utils import load_nn, mlp, deactivate_requires_grad, update_momentum
+from stable_ssl.utils import mlp, deactivate_requires_grad, update_momentum
 from stable_ssl.base import BaseModel, ModelConfig
+from models.ssl_models.create_nn import load_nn
 
 
 class JointEmbeddingModel(BaseModel):
