@@ -1,3 +1,10 @@
+import sys
+import os
+
+# Add the parent folder to sys.path
+parent_dir = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, os.path.dirname(parent_dir))
+
 from dataclasses import dataclass
 import torch
 
@@ -12,8 +19,9 @@ from models.ssl_models.custom_base import JointEmbeddingConfig, JointEmbeddingMo
 from models.ssl_models.custom_base import SelfDistillationModel, SelfDistillationConfig
 import torch.nn.functional as F
 
-from stable_ssl.utils import load_nn, mlp, deactivate_requires_grad, update_momentum
+from stable_ssl.utils import mlp, deactivate_requires_grad, update_momentum
 from stable_ssl.base import BaseModel, ModelConfig
+from models.ssl_models.create_nn import load_nn
 
 
 # CovarianceFactorization method 1
