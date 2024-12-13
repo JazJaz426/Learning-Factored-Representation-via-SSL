@@ -73,15 +73,15 @@ class CovarianceFactorization(JointEmbeddingModel):
         # loss_proj = self._compute_projector_classifier_loss(*projections)
         loss_ssl = self.compute_ssl_loss(projections[0], projections[1], reconstruction[0])
 
-        if self.global_step % self.config.log.log_every_step == 0:
-            self.log(
-                {
-                    "train/loss_ssl": loss_ssl.item(),
-                    # "train/loss_backbone_classifier": loss_backbone.item(),
-                    # "train/loss_projector_classifier": loss_proj.item(),
-                },
-                commit=False,
-            )
+        # if self.global_step % self.config.log.log_every_step == 0:
+        #     self.log(
+        #         {
+        #             "train/loss_ssl": loss_ssl.item(),
+        #             # "train/loss_backbone_classifier": loss_backbone.item(),
+        #             # "train/loss_projector_classifier": loss_proj.item(),
+        #         },
+        #         commit=False,
+        #     )
 
         return loss_ssl # + loss_proj + loss_backbone
 
@@ -104,6 +104,13 @@ class CovarianceFactorization(JointEmbeddingModel):
         
         # Reconstruction loss
         reconstruction_loss = F.mse_loss(z_j_reconstruction, z_j)
+        if self.global_step % self.config.log.log_every_step == 0:
+            self.log(
+                {
+                    "train/g_theta_loss": reconstruction_loss.item(),
+                },
+                commit=False,
+            )
         loss += reconstruction_loss
         return loss
 

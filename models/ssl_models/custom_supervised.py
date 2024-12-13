@@ -54,13 +54,13 @@ class Supervised(BaseModel):
         # logging.info(f"true labels: {self.data[1].dtype}")
         loss = F.mse_loss(predictions, self.data[1].float())
         # logging.info(f"loss: {loss.dtype}")
-        if self.global_step % self.config.log.log_every_step == 0:
-            self.log(
-                {
-                    "train/loss": loss.item(),
-                },
-                commit=False,
-            )
+        # if self.global_step % self.config.log.log_every_step == 0:
+        #     self.log(
+        #         {
+        #             "train/loss": loss.item(),
+        #         },
+        #         commit=False,
+        #     )
 
         return loss
 
