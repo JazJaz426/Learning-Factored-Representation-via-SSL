@@ -117,7 +117,7 @@ class JointEmbeddingModel(BaseModel):
                 {
                     f"eval/step/{name_loader}/mse": MeanSquaredError(num_outputs=nc),
                     f"eval/epoch/{name_loader}/mse": MeanSquaredError(num_outputs=nc),
-                    f"eval/epoch/{name_loader}/forb_norm": FrobeniusNorm(),
+                    f"eval/epoch/{name_loader}/frob_norm": FrobeniusNorm(),
                     # f"eval/epoch/{name_loader}/z_min_var": ZMinVar(),
                     # f"eval/epoch/{name_loader}/mig": MutualInformationGap(),
                 }
@@ -222,7 +222,7 @@ class SelfDistillationModel(JointEmbeddingModel):
                 {
                     f"eval/step/{name_loader}/mse": MeanSquaredError(num_outputs=nc),
                     f"eval/epoch/{name_loader}/mse": MeanSquaredError(num_outputs=nc),
-                    f"eval/epoch/{name_loader}/forb_norm": FrobeniusNorm(),
+                    f"eval/epoch/{name_loader}/frob_norm": FrobeniusNorm(),
                     f"eval/epoch/{name_loader}/z_min_var": ZMinVar(),
                     f"eval/epoch/{name_loader}/mig": MutualInformationGap(),
                 }

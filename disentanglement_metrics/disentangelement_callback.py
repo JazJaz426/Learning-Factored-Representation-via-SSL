@@ -31,7 +31,7 @@ class FrobeniusNorm(Metric):
 
         #increment total Frobenius norm and total to get avg frobenius norm across batch/count
         self.total_frob_norm += frob_norm
-        self.total += target.numel()
+        self.total += target.size()[0]
 
     def compute(self):
         # Compute final metric
