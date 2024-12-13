@@ -118,36 +118,36 @@ python train.py --config-name=ssl_methods/barlow_rl.yaml user@_global_=$USER/run
 
 * Supervised:
 ```bash
-python train.py --config-name=ssl_methods/supervised_rl.yaml user@_global_=$USER/run_slurm ++optim.epochs=250 ++hardware.seed=0 ++data.base.limit=900000 ++data.test_out.limit=100000 ++model.backbone_model=NatureCNN ++hydra.launcher.partition=3090-gcondo -m
+python train.py --config-name=ssl_methods/supervised_rl.yaml user@_global_=$USER/run_slurm ++optim.epochs=100 ++hardware.seed=0 ++data.base.limit=90000 ++data.test_out.limit=10000 ++model.backbone_model=NatureCNN ++hydra.launcher.partition=3090-gcondo -m
 
-python train.py --config-name=ssl_methods/supervised_rl.yaml user@_global_=$USER/run_slurm ++optim.epochs=250 ++hardware.seed=0 ++data.base.limit=1800000 ++data.test_out.limit=200000 ++model.backbone_model=NatureCNN ++hydra.launcher.partition=3090-gcondo -m
+python train.py --config-name=ssl_methods/supervised_rl.yaml user@_global_=$USER/run_slurm ++optim.epochs=100 ++hardware.seed=0 ++data.base.limit=180000 ++data.test_out.limit=20000 ++model.backbone_model=NatureCNN ++hydra.launcher.partition=3090-gcondo -m
 
-python train.py --config-name=ssl_methods/supervised_rl.yaml user@_global_=$USER/run_slurm ++optim.epochs=250 ++hardware.seed=0 ++data.base.limit=2700000 ++data.test_out.limit=300000 ++model.backbone_model=NatureCNN ++hydra.launcher.partition=3090-gcondo -m
+python train.py --config-name=ssl_methods/supervised_rl.yaml user@_global_=$USER/run_slurm ++optim.epochs=100 ++hardware.seed=0 ++data.base.limit=270000 ++data.test_out.limit=30000 ++model.backbone_model=NatureCNN ++hydra.launcher.partition=3090-gcondo -m
 ```
 
 * Barlow Twins:
 ```bash
-python train.py --config-name=ssl_methods/barlow_rl.yaml user@_global_=$USER/run_slurm ++optim.epochs=250 ++hardware.seed=0 ++data.base.limit=900000 ++data.test_out.limit=100000 ++model.backbone_model=NatureCNN ++hydra.launcher.partition=3090-gcondo -m
+python train.py --config-name=ssl_methods/barlow_rl.yaml user@_global_=$USER/run_slurm ++optim.epochs=100 ++hardware.seed=0 ++data.base.limit=90000 ++data.test_out.limit=10000 ++model.backbone_model=NatureCNN ++hydra.launcher.partition=3090-gcondo -m
 
-python train.py --config-name=ssl_methods/barlow_rl.yaml user@_global_=$USER/run_slurm ++optim.epochs=250 ++hardware.seed=0 ++data.base.limit=1800000 ++data.test_out.limit=200000 ++model.backbone_model=NatureCNN ++hydra.launcher.partition=3090-gcondo -m
+python train.py --config-name=ssl_methods/barlow_rl.yaml user@_global_=$USER/run_slurm ++optim.epochs=100 ++hardware.seed=0 ++data.base.limit=180000 ++data.test_out.limit=20000 ++model.backbone_model=NatureCNN ++hydra.launcher.partition=3090-gcondo -m
 
-python train.py --config-name=ssl_methods/barlow_rl.yaml user@_global_=$USER/run_slurm ++optim.epochs=250 ++hardware.seed=0 ++data.base.limit=2700000 ++data.test_out.limit=300000 ++model.backbone_model=NatureCNN ++hydra.launcher.partition=3090-gcondo -m
+python train.py --config-name=ssl_methods/barlow_rl.yaml user@_global_=$USER/run_slurm ++optim.epochs=100 ++hardware.seed=0 ++data.base.limit=270000 ++data.test_out.limit=30000 ++model.backbone_model=NatureCNN ++hydra.launcher.partition=3090-gcondo -m
 ```
 
 * Covariance Reduction Method for Factorization:
 ```bash
-python train.py --config-name=ssl_methods/covariance_factor.yaml user@_global_=$USER/run_slurm ++optim.epochs=250 ++hardware.seed=0 ++data.base.limit=900000 ++data.test_out.limit=100000 ++model.backbone_model=NatureCNN ++hydra.launcher.partition=3090-gcondo -m
+python train.py --config-name=ssl_methods/covariance_factor.yaml user@_global_=$USER/run_slurm ++optim.epochs=100 ++hardware.seed=0 ++data.base.limit=90000 ++data.test_out.limit=10000 ++model.backbone_model=NatureCNN ++hydra.launcher.partition=3090-gcondo -m
 
-python train.py --config-name=ssl_methods/covariance_factor.yaml user@_global_=$USER/run_slurm ++optim.epochs=250 ++hardware.seed=0 ++data.base.limit=1800000 ++data.test_out.limit=200000 ++model.backbone_model=NatureCNN ++hydra.launcher.partition=3090-gcondo -m
+python train.py --config-name=ssl_methods/covariance_factor.yaml user@_global_=$USER/run_slurm ++optim.epochs=100 ++hardware.seed=0 ++data.base.limit=180000 ++data.test_out.limit=20000 ++model.backbone_model=NatureCNN ++hydra.launcher.partition=3090-gcondo -m
 
-python train.py --config-name=ssl_methods/covariance_factor.yaml user@_global_=$USER/run_slurm ++optim.epochs=250 ++hardware.seed=0 ++data.base.limit=2700000 ++data.test_out.limit=300000 ++model.backbone_model=NatureCNN ++hydra.launcher.partition=3090-gcondo -m
+python train.py --config-name=ssl_methods/covariance_factor.yaml user@_global_=$USER/run_slurm ++optim.epochs=100 ++hardware.seed=0 ++data.base.limit=270000 ++data.test_out.limit=30000 ++model.backbone_model=NatureCNN ++hydra.launcher.partition=3090-gcondo -m
 ```
 
 * Masked Factorization:
 ```bash
-python train.py --config-name=ssl_methods/mask_factor.yaml user@_global_=$USER/run_slurm ++optim.epochs=250 ++hardware.seed=0 ++data.base.limit=900000 ++data.test_out.limit=100000 ++model.backbone_model=NatureCNN ++hydra.launcher.partition=3090-gcondo -m
+python train.py --config-name=ssl_methods/mask_factor.yaml user@_global_=$USER/run_slurm ++optim.epochs=100 ++hardware.seed=0 ++data.base.limit=90000 ++data.test_out.limit=10000 ++model.backbone_model=NatureCNN ++hydra.launcher.partition=3090-gcondo -m
 
-python train.py --config-name=ssl_methods/mask_factor.yaml user@_global_=$USER/run_slurm ++optim.epochs=250 ++hardware.seed=0 ++data.base.limit=1800000 ++data.test_out.limit=200000 ++model.backbone_model=NatureCNN ++hydra.launcher.partition=3090-gcondo -m
+python train.py --config-name=ssl_methods/mask_factor.yaml user@_global_=$USER/run_slurm ++optim.epochs=100 ++hardware.seed=0 ++data.base.limit=180000 ++data.test_out.limit=20000 ++model.backbone_model=NatureCNN ++hydra.launcher.partition=3090-gcondo -m
 
-python train.py --config-name=ssl_methods/mask_factor.yaml user@_global_=$USER/run_slurm ++optim.epochs=250 ++hardware.seed=0 ++data.base.limit=2700000 ++data.test_out.limit=300000 ++model.backbone_model=NatureCNN ++hydra.launcher.partition=3090-gcondo -m
+python train.py --config-name=ssl_methods/mask_factor.yaml user@_global_=$USER/run_slurm ++optim.epochs=100 ++hardware.seed=0 ++data.base.limit=270000 ++data.test_out.limit=30000 ++model.backbone_model=NatureCNN ++hydra.launcher.partition=3090-gcondo -m
 ```
