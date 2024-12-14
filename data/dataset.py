@@ -50,20 +50,22 @@ class CustomDataset(Dataset):
 
     def sample_factors(self):
 
-        #uniformly sample factors for the environment
-        sampled_factors = {}
+        #do sampling process between min max uniformly
+        for attr in self.data_env.state_attributes:
+            valid = False
+            while not valid:
+                attr_limits = self.data_env.get_low_high_attr(attr)
+                rand_vals = []
+                for limit in attr_limits:
+                    (low, high, typ) = limit
+                    rand_val = typ(np.random.uniform(low, high))
+                    rand_vals.append(rand_val)
 
-        attr_limits = self.data_env.get_low_high_attr(attr)
-        rand_vals = []
-        for limit in attr_limits:
-            (low, high, typ) = limit
-            rand_val = typ(np.random.uniform(low, high))
-            rand_vals.append(rand_val)
-
-        sampled_factors[attr] = rand_vals if len(attr_limits) > 1 else rand_vals[0]
-        valid, err = self.data_env.custom_resetter.check_valid_factors(self.data_env.env, sampled_factors)
+                sampled_factors[attr] = rand_vals if len(attr_limits) > 1 else rand_vals[0]
+                valid, err = self.data_env.custom_resetter.check_valid_factors(self.data_env.env, sampled_factors)
 
         return sampled_factors
+
 
     def sample_factor_subset(self, input_factor: Dict = {}, factor_subset: List = []):
         sampled_factors = input_factor
