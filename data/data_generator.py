@@ -7,6 +7,7 @@ from minigrid.core.world_object import Door, Goal, Key
 from minigrid.wrappers import ImgObsWrapper
 from minigrid.wrappers import FullyObsWrapper
 from gymnasium.wrappers import TimeLimit
+import torch
 import yaml
 
 import gymnasium as gym
@@ -22,6 +23,7 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 from data.data_augmentor import DataAugmentor
 from data.utils.controlled_reset import CustomEnvReset
 from matplotlib import pyplot as plt
+from .load_factored_model import load_factored_model
 
 '''
 [DONE] TODO: implement (multiple) controlled environment factors at once 
@@ -49,21 +51,12 @@ class StochasticActionWrapper(gym.ActionWrapper):
             return self.env.action_space.sample()
 
 class DataGenerator(gym.Env):
-
-    def load_config(self, file_path):
-        with open(file_path, 'r') as file:
-            config = yaml.safe_load(file)
-        return config
-
-    def __init__(self, config_filename='config.yaml'):
+    def __init__(self, config):
 
         super(DataGenerator, self).__init__()
 
         # Parse yaml file parameters for data generator
-        try:
-            configs = self.load_config(os.path.join(os.path.dirname(__file__), f'../configs/data_generator/{config_filename}'))
-        except:
-            configs = self.load_config(config_filename)
+        configs = config
         
         # Configs from the yaml file
         self.observation_type = configs['observation_space']
@@ -73,6 +66,18 @@ class DataGenerator(gym.Env):
 
         # Create the environment
         self.env = gym.make(configs['environment_name'], render_mode='rgb_array')
+        
+        # factorized model
+        try:
+            self.factored_model = load_factored_model(
+                configs['factored_model']['model'], 
+                configs['factored_model']['checkpoint']
+            )
+            self.factorized_embedding_size = configs['factored_model']['embedding_size']
+        except Exception as e:
+            print("Unable to load factorized model")
+            if self.observation_type == "factored":
+                raise e
 
         # Optionally wrap the environment for fully observable states
         self.env = FullyObsWrapper(self.env)
@@ -143,7 +148,8 @@ class DataGenerator(gym.Env):
 
 
         elif self.observation_type == 'factored':
-            raise NotImplementedError('ERROR: to be implemented after factored representation encoder')
+            embedding_size = self.factorized_embedding_size
+            return gym.spaces.Box(low=0, high=1, shape=(embedding_size,), dtype=np.float32), self._create_expert_observation_space(state_attribute_types)
 
     def get_low_high_attr(self, attr):
 
@@ -280,7 +286,7 @@ class DataGenerator(gym.Env):
         factored = None
 
         if self.observation_type == 'factored':
-            factored = self._factorize_obs(frame)
+            factored = self._factorize_obs(image)
 
 
         obs = self._get_obs(image= image, state= norm_state_array, factored= factored)
@@ -292,8 +298,8 @@ class DataGenerator(gym.Env):
         
 
     def _factorize_obs(self, observation):
-        #TODO: implement inference time call to factored representation model
-        return None
+        obs_pt = torch.tensor(observation, dtype=torch.float32).permute(2,0,1).unsqueeze(0)
+        return self.factored_model(obs_pt).detach().squeeze().numpy()
     
     def _construct_state(self):
 
@@ -367,8 +373,10 @@ if __name__ == '__main__':
 
     pdb.set_trace()
 
-    data_generator = DataGenerator()
-    data_gen_test = DataGenerator(config_filename='config.yaml')
+    config = yaml.safe_load('configs/models/config.yaml')
+    config_test = yaml.safe_load('configs/models/config_test.yaml')
+    data_generator = DataGenerator(config)
+    data_gen_test = DataGenerator(config_test)
     
     obs, info = data_generator.reset()
     obs_t, info_t = data_gen_test.reset()

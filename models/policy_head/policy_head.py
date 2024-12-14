@@ -27,9 +27,10 @@ from custom_callbacks import CustomEvalCallback, CustomVideoRecorder, RewardValu
 
 
 class PolicyHead:
-    def __init__(self, model_config_path, data_config_path, seed=None):
-        self.model_config = self.load_config(os.path.join(os.path.dirname(__file__), '../..', model_config_path))['policy_head']
-        self.data_config = self.load_config(os.path.join(os.path.dirname(__file__), '../..', data_config_path))
+    def __init__(self, model_config, data_config, data_test_config, seed=None):
+        self.model_config = model_config
+        self.data_config = data_config
+        self.data_test_config = data_test_config
         self.algorithm = self.model_config['algorithm']
         self.data_type = self.data_config['observation_space']
         self.policy_name = self.select_policy()
@@ -54,7 +55,7 @@ class PolicyHead:
         self.eval_env = self.create_parallel_envs(seed = self.seed, train=False)
 
         
-        self.dummy_env = self.create_env(seed=self.seed)()
+        self.dummy_env = self.create_env(seed=self.seed, config=data_config)()
 
 
         self.model = self.create_models(seed=self.seed)
@@ -86,10 +87,6 @@ class PolicyHead:
 
         return func
 
-    def load_config(self, config_path):
-        with open(config_path, 'r') as file:
-            return yaml.safe_load(file)
-
     def select_policy(self):
         if self.data_type == "image":
             return "CnnPolicy"
@@ -98,14 +95,11 @@ class PolicyHead:
         else:
             raise ValueError(f"Unsupported data type: {self.data_type}")
     
-    def create_env(self, seed = None, config='config.yaml'):
-        
-
+    def create_env(self, seed = None, config=None):
         def _init():
             env = Monitor(DataGenerator(config))
             env.reset(seed=seed)
             return env
-
         return _init
 
     
@@ -113,9 +107,9 @@ class PolicyHead:
         if num_parallel is None:
             num_parallel = self.model_config['num_parallel_envs']
         if train:
-            return SubprocVecEnv([self.create_env(seed, 'config.yaml') for _ in range(num_parallel)])
+            return SubprocVecEnv([self.create_env(seed, self.data_config) for _ in range(num_parallel)])
         else:
-            return SubprocVecEnv([self.create_env(seed, 'config_test.yaml') for _ in range(num_parallel)])
+            return SubprocVecEnv([self.create_env(seed, self.data_test_config) for _ in range(num_parallel)])
         
 
     def create_models(self, seed: int = 0):
@@ -123,7 +117,11 @@ class PolicyHead:
             ppo_params = {k: v for k, v in self.model_config['ppo'].items() if v is not None}
 
             #NOTE: include lr schedule if needed
-            #lr_schedule = self.linear_schedule(self.model_config['learning_rate'])                
+            #lr_schedule = self.linear_schedule(self.model_config['learning_rate'])
+            if self.data_type == "factored":
+                ppo_params['policy_kwargs'] = dict(
+                    net_arch=[dict(pi=[64], vf=[64])]
+                )
             model = PPO(
                 policy=self.policy_name,
                 env=self.parallel_train_env,
@@ -198,18 +196,56 @@ class PolicyHead:
         if self.model_config['wandb_log']:
             wandb.finish()
 
+def load_config(config_path):
+    with open(config_path, 'r') as f:
+        config = yaml.safe_load(f)
+    return config
+
+
+import collections.abc
+
+def update(d, u):
+    for k, v in u.items():
+        if isinstance(v, collections.abc.Mapping):
+            d[k] = update(d.get(k, {}), v)
+        else:
+            d[k] = v
+    return d
+
+def parse_params(params: list):
+    # parse nested parameters, such as --field1.field1b value
+    parsed_params = {}
+    for i in range(0, len(params), 2):
+        curr_params = parsed_params
+        keys = params[i].lstrip('--').split('.')
+        for key in keys[:-1]:
+            if key not in curr_params:
+                curr_params[key] = {}
+            curr_params = curr_params[key]
+        curr_params[keys[-1]] = params[i+1]
+    return parsed_params
+    
+    
+
 if __name__ == '__main__':
-    args = argparse.ArgumentParser()
-    args.add_argument('--seed', type=int, default=0)
-    args = args.parse_args()
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--seed', type=int, default=0)
+    parser.add_argument('params', nargs='*', help='Parameters to update in the config file in the form of --field1.field1b value')
+    args = parser.parse_args()
     
+    params = parse_params(args.params)
+    print("parsed additional params:", params)
     
-    print(DataGenerator('config.yaml').observation_space)
-    print(DataGenerator('config_test.yaml').observation_space)
+    model_config = load_config('configs/models/config.yaml')['policy_head']
+    data_config = update(load_config('configs/data_generator/config.yaml'), params)
+    data_test_config = update(load_config('configs/data_generator/config_test.yaml'), params)
+    
+    assert model_config is not None
+    assert data_config is not None
+    assert data_test_config is not None
   
     policy_head = PolicyHead( 
-        'configs/models/config.yaml', 
-        'configs/data_generator/config.yaml',
+        model_config, data_config, data_test_config,
         seed=args.seed
     )
     policy_head.train_and_evaluate_policy()

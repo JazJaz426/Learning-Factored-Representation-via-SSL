@@ -151,3 +151,10 @@ python train.py --config-name=ssl_methods/mask_factor.yaml user@_global_=$USER/r
 
 python train.py --config-name=ssl_methods/mask_factor.yaml user@_global_=$USER/run_slurm ++optim.epochs=100 ++hardware.seed=0 ++data.base.limit=270000 ++data.test_out.limit=30000 ++model.backbone_model=NatureCNN ++hydra.launcher.partition=3090-gcondo -m
 ```
+
+
+# Running RL Evaluation:
+factorized representation:
+```
+python -W ignore models/policy_head/policy_head.py --seed 443 -- --observation_space factored --factored_model.checkpoint ckpt/barlow_3mil.ckpt
+```

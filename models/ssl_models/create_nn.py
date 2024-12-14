@@ -210,7 +210,7 @@ class NatureCNN(nn.Module):
             nn.ReLU(),
         )
 
-        self.fc = nn.Linear(features_dim, 12)
+        # self.fc = nn.Linear(features_dim, 12)
 
     def forward(self, observations):
-        return self.fc(self.cnn(observations))
+        return self.cnn(observations)

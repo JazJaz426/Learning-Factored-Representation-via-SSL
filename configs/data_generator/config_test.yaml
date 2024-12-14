@@ -3,6 +3,11 @@ environment_name: MiniGrid-DoorKey-8x8-v0 #options: [MiniGrid-DoorKey-16x16-v0, 
 observation_space: expert #options: [image, expert, factored]
 max_steps: 500
 
+factored_model:
+  checkpoint: ""
+  embedding_size: 512
+  model: "NatureCNN"
+
 #options: [random_rotation: [max_degrees, p], random_scaling: scalar, random_masking: [num_holes (min, max), hole_height_range (min, max), hole_width_range (min, max), probability], random_greyscale: probability, random_horz_flip: probability, random_vert_flip: probability, random_color_jitter: [brightness (min, max), contrast (min, max), saturation (min, max), hue (min, max), prob]]
 transformations: {
   random_rotation: {limit: 60, p: 0.5, border_mode: 1},

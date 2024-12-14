@@ -2,6 +2,8 @@ import sys
 import os
 from typing import List, Dict
 
+import yaml
+
 # Add the parent folder to sys.path
 parent_dir = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.dirname(parent_dir))
@@ -23,9 +25,9 @@ from PIL import Image
 class CustomDataset(Dataset):
     def __init__(self, data_env_config, limit, policy_model = None, model_path = None, mode = 'seq', factor_subset = [], dataset_file=None):
         
-        self.data_env = DataGenerator(data_env_config)
+        config = yaml.safe_load(data_env_config)
+        self.data_env = DataGenerator(config)
         self.mode = mode #options: seq [sequential], cont [controlled factors], triplet [triplet pair with different actions], rand [random reset, inbuilt], step [returns s1, s2, a as state pair]
-
         self.count = 0
         self.limit = limit
        
