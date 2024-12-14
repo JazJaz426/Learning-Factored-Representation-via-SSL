@@ -7,6 +7,7 @@ from minigrid.core.world_object import Door, Goal, Key
 from minigrid.wrappers import ImgObsWrapper
 from minigrid.wrappers import FullyObsWrapper
 from gymnasium.wrappers import TimeLimit
+from collections.abc import Iterable
 import yaml
 
 import gymnasium as gym
@@ -328,16 +329,7 @@ class DataGenerator(gym.Env):
             elif ('door' in types) and (attr == 'door_open'):
                 state[attr] = int(self.env.unwrapped.grid.grid[np.where(types=='door')[0][0]].is_open)
 
-
-        norm_state_array = np.array(
-                [
-                    item \
-                    for key in sorted(state.keys()) \
-                    for item in (
-                        state[key] if isinstance(state[key], tuple) else [state[key]]
-                        )
-                ]
-            )
+        norm_state_array = np.array([item for key in sorted(state.keys()) for item in (state[key] if isinstance(state[key], Iterable) else [state[key]])])
 
         min_values = np.array(self.expert_observation_space.low)
         max_values = np.array(self.expert_observation_space.high)

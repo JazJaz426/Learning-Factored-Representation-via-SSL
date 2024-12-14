@@ -49,7 +49,8 @@ class CustomDataset(Dataset):
         return self.limit
 
     def sample_factors(self):
-
+        sampled_factors = {}
+        
         #do sampling process between min max uniformly
         for attr in self.data_env.state_attributes:
             valid = False
@@ -70,13 +71,18 @@ class CustomDataset(Dataset):
     def sample_factor_subset(self, input_factor: Dict = {}, factor_subset: List = []):
         sampled_factors = input_factor
         # Only update factors we want to sample for.
-        for factor in self.factor_subset:
+        for factor in factor_subset:
             valid = False
             while not valid:
-                low, high, typ = self.data_env.get_low_high_attr(factor)
-                rand_val = typ(np.random.uniform(low, high))
+                attr_limits = self.data_env.get_low_high_attr(factor)
+                rand_vals = []
 
-                sampled_factors[factor] = rand_val
+                for limit in attr_limits:
+                    (low, high, typ) = limit
+                    rand_val = typ(np.random.uniform(low, high))
+                    rand_vals.append(rand_val)
+
+                sampled_factors[factor] = rand_vals if len(attr_limits) > 1 else rand_vals[0]
                 valid, err = self.data_env.custom_resetter.check_valid_factors(self.data_env.env, sampled_factors)
 
         return sampled_factors
@@ -90,7 +96,7 @@ class CustomDataset(Dataset):
             "previous_state": None,
             "current_state": None,
             "previous_norm_state": None,
-            "current_norm_state": None,
+        "current_norm_state": None,
             "action": None
         }
         """
@@ -138,7 +144,7 @@ class CustomDataset(Dataset):
         elif self.mode == 'triplet':
             #get the current visual observation and underlying state
             obs_pre = self.data_env.get_curr_obs()
-            state_pre, norm_state_pre = self._construct_state()
+            state_pre, norm_state_pre = self.data_env._construct_state()
             
             #predict action and take a step in the environment
             action, __ = self.model.predict(obs, deterministic=True)
@@ -146,7 +152,7 @@ class CustomDataset(Dataset):
 
             #get the future visual observation and underlying state
             obs_post = self.data_env.get_curr_obs()
-            state_post, norm_state_post = self._construct_state()
+            state_post, norm_state_post = self.data_env._construct_state()
             
             item_dict = {}
             item_dict["previous_obs"] = obs_pre
@@ -165,12 +171,12 @@ class CustomDataset(Dataset):
             sample_factors = self.sample_factors()
             self.data_env.env = self.data_env.custom_resetter.factored_reset(self.data_env.env, self.data_env.env.unwrapped.grid.height, self.data_env.env.unwrapped.grid.width, sample_factors)
             obs_pre = self.data_env.get_curr_obs()
-            state_pre, norm_state_pre = self._construct_state()
+            state_pre, norm_state_pre = self.data_env._construct_state()
 
             updated_factors = self.sample_factor_subset(sample_factors, self.factor_subset)
             self.data_env.env = self.data_env.custom_resetter.factored_reset(self.data_env.env, self.data_env.env.unwrapped.grid.height, self.data_env.env.unwrapped.grid.width, updated_factors)
             obs_post = self.data_env.get_curr_obs()
-            state_post, norm_state_post = self._construct_state()
+            state_post, norm_state_post = self.data_env._construct_state()
             item_dict = {}
             item_dict["previous_obs"] = obs_pre
             item_dict["current_obs"] = obs_post
