@@ -21,7 +21,7 @@ class EvaluationDataset:
         # Load config and get controlled factors
         with open(config_path, 'r') as f:
             config = yaml.safe_load(f)
-            self.controlled_factors = config['controlled_factors']
+            self.all_factors = config['state_attributes']
     
     def generate_factor_samples(self) -> Dict[str, List[Dict]]:
         """Generate samples for each controlled factor.
@@ -32,7 +32,7 @@ class EvaluationDataset:
         factor_samples = {}
         
         # For each controlled factor
-        for factor in self.controlled_factors.keys():
+        for factor in self.all_factors.keys():
             print(f"Generating samples for factor: {factor}")
             
             # Create dataset with single factor subset
