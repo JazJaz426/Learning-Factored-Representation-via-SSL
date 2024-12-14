@@ -32,7 +32,7 @@ class EvaluationDataset:
         factor_samples = {}
         
         # For each controlled factor
-        for factor in self.all_factors.keys():
+        for factor in self.all_factors:
             print(f"Generating samples for factor: {factor}")
             
             # Create dataset with single factor subset
@@ -74,12 +74,12 @@ class EvaluationDataset:
 
 def main():
     # Paths
-    config_path = 'configs/data_generator/config.yaml'
-    output_dir = 'data/evaluation_samples'
+    config_path = os.path.relpath('../configs/data_generator/config.yaml')
+    output_dir = os.path.relpath('eval_data/evaluation_samples')
     
     # Generate and save samples
-    eval_dataset = EvaluationDataset(config_path)
-    eval_dataset.save_samples(output_dir)
+    # eval_dataset = EvaluationDataset(config_path)
+    # eval_dataset.save_samples(output_dir)
 
     # Load and inspect saved samples
     output_path = os.path.join(output_dir, 'factor_samples.pkl')
@@ -89,8 +89,12 @@ def main():
     # Print summary of loaded samples
     print("\nInspecting loaded samples:")
     for factor, samples in loaded_samples.items():
+
+
         print(f"\nFactor: {factor}")
         print(f"Number of samples: {len(samples)}")
+        print(f"Samples: {samples}")
+        
         if len(samples) > 0:
             print("First sample keys:", samples[0].keys())
             print("First sample shapes:")
@@ -101,6 +105,8 @@ def main():
                     print(f"  {key}: {len(value)}")
                 else:
                     print(f"  {key}: {type(value)}")
+        else:
+            print('ERROR!!!')
 
 if __name__ == '__main__':
     main()

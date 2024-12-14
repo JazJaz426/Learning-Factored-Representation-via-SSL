@@ -1,9 +1,13 @@
+parent_dir = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, os.path.dirname(parent_dir))
+
+
 from models.ssl_models.custom_supervised import Supervised
 from models.ssl_models.custom_barlow_twins import BarlowTwins
 from models.ssl_models.factored_models import CovarianceFactorization, MaskingFactorization
 
-parent_dir = os.path.dirname(os.path.abspath(__file__))
-sys.path.insert(0, os.path.dirname(parent_dir))
+from data.load_factored_model import load_factored_model
+
 from omegaconf import DictConfig
 
 from dataset import CustomDataset
@@ -36,15 +40,22 @@ def compute_cosine_similarity(tensor1, tensor2):
 
     return average_cosine_similarity
 
-def run_training_dynamics(cfg: DictConfig):
-
-    args = get_args(cfg)
+def run_training_dynamics(config_path:str='../configs.data_generator/config.yaml', dataset_file:str = ''):
+    
+    with open(os.path.join(os.path.abspath(__file__), config_path)) as file:
+        data_configs = yaml.safe_load(file)
 
     #get the model being used, load its weights from checkpoint file and set backbone to eval mode
-    model = model_dict[args.model.name](args)
+    try:
+        model = load_factored_model(
+            data_configs['factored_model']['model'], 
+            data_configs['factored_model']['checkpoint']
+        )
+    except Exception as e:
+        print("Unable to load factorized model")
+        raise e
 
-    #TODO: load the weights from checkpoints
-    model.backbone.eval()
+    model.eval()
 
 
     #setup model hooks to get intermediate representations and expert states
@@ -59,22 +70,22 @@ def run_training_dynamics(cfg: DictConfig):
     
 
     def register_hooks(model, activations_dict):
-        for name, layer in model.backbone.named_modules():
+        for name, layer in model.named_modules():
             if isinstance(layer, nn.Conv2d) or isinstance(layer, nn.ReLU) or isinstance(layer, nn.Linear):
                 layer.register_forward_hook(hook_fn(name, activations_dict))
 
 
 
-    #setup the data loader for the test set
-    with open(os.path.join(os.path.abspath(__file__), '../configs.data_generator/config.yaml')) as file:
-        data_configs = yaml.safe_load(file)
-    
-    #TODO: add the dataset_file param
-    test_dataset = CustomDataset(data_env_config=data_configs, limit=None, dataset_file=None)
-    test_dataloader = DataLoader(test_dataset, batch_size=100, shuffle=True)
+    try:
+        eval_data_path = os.path.relpath('../eval_data/evaluation_samples/factor_samples.pkl')
+        test_dataset = CustomDataset(data_env_config=data_configs, limit=None, dataset_file=eval_data_path)
+        test_dataloader = DataLoader(test_dataset, batch_size=100, shuffle=True)
+    except Exception as e:
+        print("ERROR: {}".format(e))
+        raise e
 
     for item in test_dataloader:
-        (obs, state, new_obs, new_state, changed_factor) = item
+        (obs, new_obs, state, new_state, changed_factor) = item
 
         #concatenate original and changed observations
         all_obs = torch.cat((obs, new_obs), dim=0)
@@ -219,7 +230,7 @@ def run_training_dynamics(cfg: DictConfig):
 
 if __name__ == __main__():
 
-    run_training_dynamics()
+    cosine_sim, mutial_info, mutual_info_gaps = run_training_dynamics()
 
 
 

@@ -41,7 +41,9 @@ class CustomDataset(Dataset):
 
         #store reference to CSV file if test set is loaded
         if dataset_file is not None:
-            self.dataset = pd.read_csv(dataset_file)
+            with open(dataset_file, 'rb') as f:
+                self.dataset = pickle.load(f)
+            
             self.mode = 'test_file'
             self.limit = len(self.dataset)
 
@@ -185,8 +187,8 @@ class CustomDataset(Dataset):
             return item_dict
         
         elif self.model == 'test_file':
-            data_row = self.dataset.iloc[index]
-            return data_row
+            factor, sample = self.dataset[index]
+            return sample['previous_obs'], sample['current_obs'], sample['previous_state'], sample['current_state'], factor
         
         else:
             raise NotImplementedError(f'ERROR: data generation mode cannot be {self.mode}')
