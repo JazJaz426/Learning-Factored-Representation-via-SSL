@@ -179,7 +179,7 @@ class CustomDataset(Dataset):
             return item_dict
         
         elif self.model == 'test_file':
-            data_row = self.dataset.iloc[idx]
+            data_row = self.dataset.iloc[index]
             return data_row
         
         else:
