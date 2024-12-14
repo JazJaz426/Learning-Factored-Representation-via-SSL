@@ -27,13 +27,14 @@ from custom_callbacks import CustomEvalCallback, CustomVideoRecorder, RewardValu
 
 
 class PolicyHead:
-    def __init__(self, model_config, data_config, data_test_config, seed=None):
+    def __init__(self, model_config, data_config, data_test_config, seed=None, group_name=""):
         self.model_config = model_config
         self.data_config = data_config
         self.data_test_config = data_test_config
         self.algorithm = self.model_config['algorithm']
         self.data_type = self.data_config['observation_space']
         self.policy_name = self.select_policy()
+        self.group_name = group_name
 
         #set the seed in order to create argparsable separate runs for each seed
         self.seed = self.model_config['seed'] if seed is None else seed
@@ -156,8 +157,8 @@ class PolicyHead:
         wandb.init(
             project='ssl_rl',
             entity='ssl-factored-reps', 
-            name=f'{self.algorithm}_{self.data_config["environment_name"]}_{self.data_config["observation_space"]}_seed_{self.seed}',
-            group=f'{self.algorithm}_{self.data_config["environment_name"]}_{self.data_config["observation_space"]}',
+            name=f'{self.algorithm}_{self.group_name}_{self.data_config["environment_name"]}_{self.data_config["observation_space"]}_seed_{self.seed}',
+            group=f'{self.algorithm}_{self.group_name}_{self.data_config["environment_name"]}_{self.data_config["observation_space"]}',
             sync_tensorboard=True,
             monitor_gym=True,
             config={
@@ -230,11 +231,14 @@ def parse_params(params: list):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--seed', type=int, default=0)
+    parser.add_argument('--log_group_name', type=str, default='')
     parser.add_argument('params', nargs='*', help='Parameters to update in the config file in the form of --field1.field1b value')
     args = parser.parse_args()
     
     params = parse_params(args.params)
     print("parsed additional params:", params)
+    print("group name:", args.log_group_name)
+    print("seed:", args.seed)
     
     model_config = load_config('configs/models/config.yaml')['policy_head']
     data_config = update(load_config('configs/data_generator/config.yaml'), params)
@@ -246,7 +250,7 @@ if __name__ == '__main__':
   
     policy_head = PolicyHead( 
         model_config, data_config, data_test_config,
-        seed=args.seed
+        group_name=args.log_group_name, seed=args.seed
     )
     policy_head.train_and_evaluate_policy()
 
