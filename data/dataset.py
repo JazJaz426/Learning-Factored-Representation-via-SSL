@@ -1,5 +1,6 @@
 import sys
 import os
+from typing import List, Dict
 
 # Add the parent folder to sys.path
 parent_dir = os.path.dirname(os.path.abspath(__file__))
@@ -19,13 +20,14 @@ from PIL import Image
 
 
 class CustomDataset(Dataset):
-    def __init__(self, data_env_config, limit, policy_model = None, model_path = None, mode = 'seq'):
+    def __init__(self, data_env_config, limit, policy_model = None, model_path = None, mode = 'seq', factor_subset = []):
         
         self.data_env = DataGenerator(data_env_config)
         self.count = 0
         self.limit = limit
         self.mode = mode #options: seq [sequential], cont [controlled factors], triplet [triplet pair with different actions], rand [random reset, inbuilt], step [returns s1, s2, a as state pair]
         self.classes = list(range(12))
+        self.factor_subset = factor_subset
 
         #policy model used for data generation: load from checkpoint path if needed
         if policy_model is not None:
@@ -41,19 +43,30 @@ class CustomDataset(Dataset):
 
         #uniformly sample factors for the environment
         sampled_factors = {}
-        valid = False
 
-        while not valid:
-            
-            #do sampling process between min max uniformly
-            for attr in self.data_env.state_attributes:
-
+        #do sampling process between min max uniformly
+        for attr in self.data_env.state_attributes:
+            valid = False
+            while not valid:
                 low, high, typ = self.data_env.get_low_high_attr(attr)
                 rand_val = typ(np.random.uniform(low, high))
 
                 sampled_factors[attr] = rand_val
+                valid, err = self.data_env.custom_resetter.check_valid_factors(self.data_env.env, sampled_factors)
 
-            valid, err = self.data_env.custom_resetter.check_valid_factors(self.data_env.env, sampled_factors)
+        return sampled_factors
+
+    def sample_factor_subset(self, input_factor: Dict = {}, factor_subset: List = []):
+        sampled_factors = input_factor
+        # Only update factors we want to sample for.
+        for factor in self.factor_subset:
+            valid = False
+            while not valid:
+                low, high, typ = self.data_env.get_low_high_attr(factor)
+                rand_val = typ(np.random.uniform(low, high))
+
+                sampled_factors[factor] = rand_val
+                valid, err = self.data_env.custom_resetter.check_valid_factors(self.data_env.env, sampled_factors)
 
         return sampled_factors
 
@@ -137,6 +150,22 @@ class CustomDataset(Dataset):
             item_dict["action"] = action
             item_dict["alternate_action"] = None  # TODO
             raise NotImplementedError(f'ERROR: data generation mode cannot be {self.mode}')
+        elif self.mode == 'sample':
+            sample_factors = self.sample_factors()
+            self.data_env.env = self.data_env.custom_resetter.factored_reset(self.data_env.env, self.data_env.env.unwrapped.grid.height, self.data_env.env.unwrapped.grid.width, sample_factors)
+            obs_pre = self.data_env.get_curr_obs()
+            state_pre, norm_state_pre = self._construct_state()
+
+            updated_factors = self.sample_factor_subset(sample_factors, self.factor_subset)
+            self.data_env.env = self.data_env.custom_resetter.factored_reset(self.data_env.env, self.data_env.env.unwrapped.grid.height, self.data_env.env.unwrapped.grid.width, updated_factors)
+            obs_post = self.data_env.get_curr_obs()
+            state_post, norm_state_post = self._construct_state()
+            item_dict = {}
+            item_dict["previous_obs"] = obs_pre
+            item_dict["current_obs"] = obs_post
+            item_dict["previous_state"] = state_pre
+            item_dict["current_state"] = state_post
+            return item_dict
         else:
             raise NotImplementedError(f'ERROR: data generation mode cannot be {self.mode}')
 
