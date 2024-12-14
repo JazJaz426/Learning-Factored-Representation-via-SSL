@@ -146,9 +146,14 @@ class DataGenerator(gym.Env):
             raise NotImplementedError('ERROR: to be implemented after factored representation encoder')
 
     def get_low_high_attr(self, attr):
-        (low, high, typ) = self.gym_space_params[self.state_attribute_types[attr]]
 
-        return low, high, typ
+        limits = []
+
+        for attr_type in self.state_attribute_types[attr]:
+            attr_limit = self.gym_space_params[attr_type]
+            limits.append(attr_limit)
+
+        return limits
             
     def render(self):
         '''Implementing render() according to ABC of gymnasium env'''

@@ -16,16 +16,23 @@ except:
 import numpy as np
 
 import pdb
+import pandas as pd
 from PIL import Image
 
 
 class CustomDataset(Dataset):
+<<<<<<< HEAD
     def __init__(self, data_env_config, limit, policy_model = None, model_path = None, mode = 'seq', factor_subset = []):
+=======
+    def __init__(self, data_env_config, limit, policy_model = None, model_path = None, mode = 'seq', dataset_file=None):
+>>>>>>> 882f917 (bug fix for factor sampling with multiple dimensions e.g. agent/key positon)
         
         self.data_env = DataGenerator(data_env_config)
+        self.mode = mode #options: seq [sequential], cont [controlled factors], triplet [triplet pair with different actions], rand [random reset, inbuilt], step [returns s1, s2, a as state pair]
+
         self.count = 0
         self.limit = limit
-        self.mode = mode #options: seq [sequential], cont [controlled factors], triplet [triplet pair with different actions], rand [random reset, inbuilt], step [returns s1, s2, a as state pair]
+       
         self.classes = list(range(12))
         self.factor_subset = factor_subset
 
@@ -36,6 +43,12 @@ class CustomDataset(Dataset):
         else:
             self.model = RandomPolicy(self.data_env)
 
+        #store reference to CSV file if test set is loaded
+        if dataset_file is not None:
+            self.dataset = pd.read_csv(dataset_file)
+            self.mode = 'test_file'
+            self.limit = len(self.dataset)
+
     def __len__(self):
         return self.limit
 
@@ -44,12 +57,10 @@ class CustomDataset(Dataset):
         #uniformly sample factors for the environment
         sampled_factors = {}
 
-        #do sampling process between min max uniformly
-        for attr in self.data_env.state_attributes:
-            valid = False
-            while not valid:
-                low, high, typ = self.data_env.get_low_high_attr(attr)
-                rand_val = typ(np.random.uniform(low, high))
+                attr_limits = self.data_env.get_low_high_attr(attr)
+                for limit in attr_limits:
+                    (low, high, typ) = limit
+                    rand_val = typ(np.random.uniform(low, high))
 
                 sampled_factors[attr] = rand_val
                 valid, err = self.data_env.custom_resetter.check_valid_factors(self.data_env.env, sampled_factors)
@@ -150,6 +161,7 @@ class CustomDataset(Dataset):
             item_dict["action"] = action
             item_dict["alternate_action"] = None  # TODO
             raise NotImplementedError(f'ERROR: data generation mode cannot be {self.mode}')
+<<<<<<< HEAD
         elif self.mode == 'sample':
             sample_factors = self.sample_factors()
             self.data_env.env = self.data_env.custom_resetter.factored_reset(self.data_env.env, self.data_env.env.unwrapped.grid.height, self.data_env.env.unwrapped.grid.width, sample_factors)
@@ -166,6 +178,13 @@ class CustomDataset(Dataset):
             item_dict["previous_state"] = state_pre
             item_dict["current_state"] = state_post
             return item_dict
+=======
+        
+        elif self.model == 'test_file':
+            data_row = self.dataset.iloc[idx]
+            return data_row
+        
+>>>>>>> 882f917 (bug fix for factor sampling with multiple dimensions e.g. agent/key positon)
         else:
             raise NotImplementedError(f'ERROR: data generation mode cannot be {self.mode}')
 
