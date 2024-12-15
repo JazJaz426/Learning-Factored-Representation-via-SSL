@@ -22,6 +22,7 @@ class EvaluationDataset:
         with open(config_path, 'r') as f:
             config = yaml.safe_load(f)
             self.all_factors = config['state_attributes']
+            self.all_factor_types = config['state_attribute_types']
     
     def generate_factor_samples(self) -> Dict[str, List[Dict]]:
         """Generate samples for each controlled factor.
@@ -36,20 +37,28 @@ class EvaluationDataset:
             print(f"Generating samples for factor: {factor}")
             
             # Create dataset with single factor subset
-            dataset = CustomDataset(
-                data_env_config=self.config_path,
-                limit=self.samples_per_factor,
-                mode='sample',
-                factor_subset=[factor]
-            )
             
-            # Collect samples
-            samples = []
-            for i in range(self.samples_per_factor):
-                sample = dataset[i]
-                samples.append(sample)
+            print('FACTOR: ', factor)
             
-            factor_samples[factor] = samples
+            
+            for i in range(len(self.all_factor_types[factor])):
+                dataset = CustomDataset(
+                    data_env_config=self.config_path,
+                    limit=self.samples_per_factor,
+                    mode='sample_with_index',
+                    factor_subset=[factor],
+                    factor_indexes=[i if len(self.all_factor_types[factor])>1 else None]
+                )
+            
+                # Collect samples
+                samples = []
+                for i in range(self.samples_per_factor):
+                    sample = dataset[i]
+                    samples.append(sample)
+                
+                if factor not in factor_samples:
+                    factor_samples[factor] = []
+                factor_samples[factor] += samples
             
         return factor_samples
     
@@ -78,8 +87,8 @@ def main():
     output_dir = os.path.relpath('eval_data/evaluation_samples')
     
     # Generate and save samples
-    # eval_dataset = EvaluationDataset(config_path)
-    # eval_dataset.save_samples(output_dir)
+    eval_dataset = EvaluationDataset(config_path)
+    eval_dataset.save_samples(output_dir)
 
     # Load and inspect saved samples
     output_path = os.path.join(output_dir, 'factor_samples.pkl')

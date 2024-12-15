@@ -18,10 +18,11 @@ import numpy as np
 import pdb
 import pandas as pd
 from PIL import Image
-
+import pickle
+import copy
 
 class CustomDataset(Dataset):
-    def __init__(self, data_env_config, limit, policy_model = None, model_path = None, mode = 'seq', factor_subset = [], dataset_file=None):
+    def __init__(self, data_env_config, limit, policy_model = None, model_path = None, mode = 'seq', factor_subset = [], factor_indexes = [], dataset_file=None):
         
         self.data_env = DataGenerator(data_env_config)
         self.mode = mode #options: seq [sequential], cont [controlled factors], triplet [triplet pair with different actions], rand [random reset, inbuilt], step [returns s1, s2, a as state pair]
@@ -31,6 +32,9 @@ class CustomDataset(Dataset):
        
         self.classes = list(range(12))
         self.factor_subset = factor_subset
+        
+        
+        self.factor_indexes = factor_indexes
 
         #policy model used for data generation: load from checkpoint path if needed
         if policy_model is not None:
@@ -40,9 +44,18 @@ class CustomDataset(Dataset):
             self.model = RandomPolicy(self.data_env)
 
         #store reference to CSV file if test set is loaded
+        # pdb.set_trace()
         if dataset_file is not None:
+
+            self.dataset = []
+            self.factors = []
+
             with open(dataset_file, 'rb') as f:
-                self.dataset = pickle.load(f)
+                pickle_data = pickle.load(f)
+            
+            for factor in pickle_data:
+                self.dataset+=pickle_data[factor]
+                self.factors+=[factor]*len(pickle_data[factor])
             
             self.mode = 'test_file'
             self.limit = len(self.dataset)
@@ -61,7 +74,7 @@ class CustomDataset(Dataset):
                 rand_vals = []
                 for limit in attr_limits:
                     (low, high, typ) = limit
-                    rand_val = typ(np.random.uniform(low, high))
+                    rand_val = typ(np.random.uniform(low, high+1))
                     rand_vals.append(rand_val)
 
                 sampled_factors[attr] = rand_vals if len(attr_limits) > 1 else rand_vals[0]
@@ -70,22 +83,84 @@ class CustomDataset(Dataset):
         return sampled_factors
 
 
-    def sample_factor_subset(self, input_factor: Dict = {}, factor_subset: List = []):
-        sampled_factors = input_factor
+    def update_factor_subset(self, input_factor: Dict = {}, factor_subset: List = []):
+        sampled_factors = copy.deepcopy(input_factor)
         # Only update factors we want to sample for.
-        for factor in factor_subset:
+        for i,factor in enumerate(factor_subset):
             valid = False
             while not valid:
                 attr_limits = self.data_env.get_low_high_attr(factor)
                 rand_vals = []
-
+                
                 for limit in attr_limits:
                     (low, high, typ) = limit
-                    rand_val = typ(np.random.uniform(low, high))
+                    rand_val = typ(np.random.uniform(low, high+1))
+                    rand_vals.append(rand_val)
+                
+                #if the sampled factor is the same as before, iterate again
+                if (len(attr_limits)>1 and rand_vals == sampled_factors[factor]) or (len(attr_limits)==1 and rand_vals[0]==sampled_factors[factor]):
+                    continue
+                
+                #if no specific index to update is specified, update the whole factor, else update parts of the factor
+                sampled_factors[factor] = rand_vals if len(attr_limits) > 1 else rand_vals[0]
+                
+
+                #NOTE & TODO: need to fix this, just patch work for now
+                if (factor == 'holding_key') and sampled_factors[factor] == 1:
+                    sampled_factors['key_pos'] = (None, None)
+                elif (factor == 'door_locked') and sampled_factors[factor] == 1:
+                    sampled_factors['door_open'] = 0
+
+
+                valid, err = self.data_env.custom_resetter.check_valid_factors(self.data_env.env, sampled_factors, strict_check=False)
+
+        return sampled_factors
+    
+    def update_factor_subset_with_index(self, input_factor: Dict = {}, factor_subset: List = [], factored_indexes: List = []):
+        
+        sampled_factors = copy.deepcopy(input_factor)
+        
+        
+        # Only update factors we want to sample for.
+        for i,factor in enumerate(factor_subset):
+            valid = False
+            
+            while not valid:
+                attr_limits = self.data_env.get_low_high_attr(factor)
+                rand_vals = []
+
+                
+                for limit in attr_limits:
+                    (low, high, typ) = limit
+                    rand_val = typ(np.random.uniform(low, high+1))
                     rand_vals.append(rand_val)
 
-                sampled_factors[factor] = rand_vals if len(attr_limits) > 1 else rand_vals[0]
-                valid, err = self.data_env.custom_resetter.check_valid_factors(self.data_env.env, sampled_factors)
+                rand_vals = rand_vals if len(attr_limits) > 1 else rand_vals[0]
+                
+                
+                #if the sampled factor is the same as before, iterate again
+                if (factored_indexes[i] is None and (rand_vals == sampled_factors[factor])) or (factored_indexes[i] is not None and sampled_factors[factor][factored_indexes[i]] == rand_vals[factored_indexes[i]]):
+                    continue
+                
+                
+                #if no specific index to update is specified, update the whole factor, else update parts of the factor
+                if factored_indexes[i] is None:
+                    sampled_factors[factor] = rand_vals
+                else:
+                    sampled_factors[factor][factored_indexes[i]] = rand_vals[factored_indexes[i]]
+                
+                #NOTE & TODO: need to fix this, just patch work for now
+                if (factor == 'holding_key') and sampled_factors[factor] == 1:
+                    sampled_factors['key_pos'] = (None, None)
+                elif (factor == 'door_locked') and sampled_factors[factor] == 1:
+                    sampled_factors['door_open'] = 0
+
+                
+                valid, err = self.data_env.custom_resetter.check_valid_factors(self.data_env.env, sampled_factors, strict_check=False)
+
+                
+            
+            
 
         return sampled_factors
 
@@ -175,7 +250,8 @@ class CustomDataset(Dataset):
             obs_pre = self.data_env.get_curr_obs()
             state_pre, norm_state_pre = self.data_env._construct_state()
 
-            updated_factors = self.sample_factor_subset(sample_factors, self.factor_subset)
+            
+            updated_factors = self.update_factor_subset(sample_factors, self.factor_subset)
             self.data_env.env = self.data_env.custom_resetter.factored_reset(self.data_env.env, self.data_env.env.unwrapped.grid.height, self.data_env.env.unwrapped.grid.width, updated_factors)
             obs_post = self.data_env.get_curr_obs()
             state_post, norm_state_post = self.data_env._construct_state()
@@ -186,8 +262,31 @@ class CustomDataset(Dataset):
             item_dict["current_state"] = state_post
             return item_dict
         
-        elif self.model == 'test_file':
-            factor, sample = self.dataset[index]
+        elif self.mode == 'sample_with_index':
+            
+            sample_factors = self.sample_factors()
+            self.data_env.env = self.data_env.custom_resetter.factored_reset(self.data_env.env, self.data_env.env.unwrapped.grid.height, self.data_env.env.unwrapped.grid.width, sample_factors)
+            obs_pre = self.data_env.get_curr_obs()
+            state_pre, norm_state_pre = self.data_env._construct_state()
+            
+            
+            updated_factors = self.update_factor_subset_with_index(sample_factors, self.factor_subset, self.factor_indexes)
+            
+            #TODO: fix strict check later
+            self.data_env.env = self.data_env.custom_resetter.factored_reset(self.data_env.env, self.data_env.env.unwrapped.grid.height, self.data_env.env.unwrapped.grid.width, updated_factors, strict_check=False)
+            obs_post = self.data_env.get_curr_obs()
+            state_post, norm_state_post = self.data_env._construct_state()
+            item_dict = {}
+            item_dict["previous_obs"] = obs_pre
+            item_dict["current_obs"] = obs_post
+            item_dict["previous_state"] = state_pre
+            item_dict["current_state"] = state_post
+            return item_dict
+        
+        elif self.mode == 'test_file':
+            
+            sample = self.dataset[index]
+            factor = self.factors[index]
             return sample['previous_obs'], sample['current_obs'], sample['previous_state'], sample['current_state'], factor
         
         else:

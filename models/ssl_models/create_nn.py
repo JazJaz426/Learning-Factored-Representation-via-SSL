@@ -106,7 +106,7 @@ class resnet9(nn.Module):
         )
         self.pool = nn.Sequential(nn.AdaptiveMaxPool2d(1), nn.Flatten())
 
-        self.fc = nn.Linear(1028, num_classes)
+        # self.fc = nn.Linear(1028, num_classes)
 
     @staticmethod
     def conv_block(in_channels, out_channels, pool=False):
@@ -128,7 +128,7 @@ class resnet9(nn.Module):
         out = self.res2(out) + out
         out = self.conv5(out)
         out = self.res3(out) + out
-        out = self.fc(self.pool(out))
+        # out = self.fc(self.pool(out))
         return out
 
 
@@ -170,7 +170,7 @@ class ConvMixer(nn.Module):
         )
 
         self.pool = nn.Sequential(nn.AdaptiveMaxPool2d(1), nn.Flatten())
-        self.fc = nn.Linear(dim, num_classes)
+        # self.fc = nn.Linear(dim, num_classes)
 
     def forward(self, xb):
         out = self.conv1(xb)
@@ -210,7 +210,8 @@ class NatureCNN(nn.Module):
             nn.ReLU(),
         )
 
-        self.fc = nn.Linear(features_dim, 12)
+        # self.fc = nn.Linear(features_dim, 12)
 
     def forward(self, observations):
-        return self.fc(self.cnn(observations))
+        #self.fc(self.cnn(observations))
+        return self.cnn(observations)

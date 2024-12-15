@@ -20,7 +20,7 @@ class CustomEnvReset:
         
         self.all_factors = set(all_factors)
     
-    def check_valid_factors(self, env, controlled_factors):
+    def check_valid_factors(self, env, controlled_factors, strict_check=True):
         
         #populate empty set with all controlled factors to check
         occupied_locations = set([])
@@ -56,21 +56,21 @@ class CustomEnvReset:
                 occupied_locations.add((controlled_val[0], controlled_val[1]))
 
         #check 3: specific to doorkey, if door is open and key is not held
-        if ('door_open' in controlled_factors and controlled_factors['door_open']) and ('door_locked' in controlled_factors and controlled_factors['door_locked']):
+        if (strict_check) and ('door_open' in controlled_factors and controlled_factors['door_open']) and ('door_locked' in controlled_factors and controlled_factors['door_locked']):
             return False, 'controlled_reset.py: Cannot have door open and locked at same time'
         
         #check 4: specific to doorkey, if holding key and key_pos is part of controlled factors
-        if ('holding_key' in controlled_factors and controlled_factors['holding_key']) and ('key_pos' in controlled_factors):
+        if (strict_check) and ('holding_key' in controlled_factors and controlled_factors['holding_key']) and ('key_pos' in controlled_factors):
             
             return False, 'controlled_reset.py: Cannot have agent hold a key but also specify key position'
         
-        #check 5: specific to doorkey, if door is closed, the key position should be to left or the key should be held
-        if ('door_locked' in controlled_factors and controlled_factors['door_locked']) and ('door_pos' in controlled_factors) and (('agent_pos' in controlled_factors and controlled_factors['agent_pos'][0] < controlled_factors['door_pos'][0] and 'key_pos' in controlled_factors and controlled_factors['key_pos'[0] > controlled_factors['door_pos'][0]]) or ('agent_pos' in controlled_factors and controlled_factors['agent_pos'][0] > controlled_factors['door_pos'][0] and 'key_pos' in controlled_factors and controlled_factors['key_pos'[0] < controlled_factors['door_pos'][0]])):
+        #check 5: specific to doorkey, if door is locked, the key position should be to left or the key should be held
+        if (strict_check) and ('door_locked' in controlled_factors and controlled_factors['door_locked']) and ('door_pos' in controlled_factors) and (('agent_pos' in controlled_factors and controlled_factors['agent_pos'][0] < controlled_factors['door_pos'][0] and 'key_pos' in controlled_factors and controlled_factors['key_pos'][0] > controlled_factors['door_pos'][0]) or ('agent_pos' in controlled_factors and controlled_factors['agent_pos'][0] > controlled_factors['door_pos'][0] and 'key_pos' in controlled_factors and controlled_factors['key_pos'][0] < controlled_factors['door_pos'][0])):
             return False, 'controlled_reset.py: Cannot have door be locked yet the key and agent opposite sides of the door'
          
         return True, None
 
-    def _custom_reset_doorkey(self, env, width, height, controlled_factors={}):
+    def _custom_reset_doorkey(self, env, width, height, controlled_factors={}, strict_check=True):
         
         #change the random seed locally 
         curr_rng = env.unwrapped.np_random
@@ -84,7 +84,7 @@ class CustomEnvReset:
         env.unwrapped.grid.wall_rect(0, 0, width, height)
 
         #check if the controlled factors is valid or not
-        valid, error = self.check_valid_factors(env, controlled_factors)
+        valid, error = self.check_valid_factors(env, controlled_factors, strict_check=strict_check)
 
         if not valid:
             raise Exception(f'ERROR: the factors {controlled_factors} are not valid | {error}')
@@ -254,7 +254,7 @@ class CustomEnvReset:
         env.unwrapped.np_random = curr_rng
         return env
 
-    def _custom_reset_empty(self, env, width, height, controlled_factors={}):
+    def _custom_reset_empty(self, env, width, height, controlled_factors={},  strict_check=True):
         #change the random seed locally 
         curr_rng = env.unwrapped.np_random
         local_rng = np.random.default_rng(int(100*random.random()))
@@ -267,7 +267,7 @@ class CustomEnvReset:
         env.unwrapped.grid.wall_rect(0, 0, width, height)
 
         #check if the controlled factors is valid or not
-        valid, error = self.check_valid_factors(env, controlled_factors)
+        valid, error = self.check_valid_factors(env, controlled_factors, strict_check= strict_check)
 
         if not valid:
             raise Exception(f'ERROR: the factors {controlled_factors} are not valid | {error}')
@@ -333,7 +333,7 @@ class CustomEnvReset:
         env.unwrapped.mission = "get to the green goal square"
         return env
         
-    def _custom_reset_fourrooms(self, env, width, height, controlled_factors={}):
+    def _custom_reset_fourrooms(self, env, width, height, controlled_factors={},  strict_check=True):
 
         #change the random seed locally 
         curr_rng = env.unwrapped.np_random
@@ -374,7 +374,7 @@ class CustomEnvReset:
                     env.unwrapped.grid.set(*pos, None)
         
         #check if the controlled factors is valid or not
-        valid, error = self.check_valid_factors(env, controlled_factors)
+        valid, error = self.check_valid_factors(env, controlled_factors,  strict_check=strict_check)
 
         if not valid:
             raise Exception(f'ERROR: the factors {controlled_factors} are not valid | {error}')
@@ -450,7 +450,7 @@ class CustomEnvReset:
         return env
 
 
-    def _custom_reset_lavacrossing(self, env, width, height, controlled_factors={}):
+    def _custom_reset_lavacrossing(self, env, width, height, controlled_factors={},  strict_check=True):
 
         #change the random seed locally 
         curr_rng = env.unwrapped.np_random
@@ -463,7 +463,7 @@ class CustomEnvReset:
         assert width >= 5 and height >= 5
 
         #check if the controlled factors is valid or not
-        valid, error = self.check_valid_factors(env, controlled_factors)
+        valid, error = self.check_valid_factors(env, controlled_factors,  strict_check=strict_check)
 
         if not valid:
             raise Exception(f'ERROR: the factors {controlled_factors} are not valid | {error}')
