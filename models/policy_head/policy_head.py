@@ -1,7 +1,10 @@
 import yaml
 from stable_baselines3 import PPO, DQN, A2C
 from stable_baselines3.common.monitor import Monitor
-from stable_baselines3.common.vec_env import SubprocVecEnv
+from stable_baselines3.common.torch_layers import FlattenExtractor
+from utils.impala_cnn import ImpalaCNN
+from utils.flatten_mlp import FlattenMLP
+from stable_baselines3.common.vec_env import SubprocVecEnv, VecTransposeImage
 import numpy as np
 import sys
 import os
@@ -20,7 +23,7 @@ import pandas as pd
 import wandb
 
 import argparse
-
+import pdb
 
 
 from custom_callbacks import CustomEvalCallback, CustomVideoRecorder, RewardValueCallback, ValuePlottingCallback
@@ -113,23 +116,36 @@ class PolicyHead:
         if num_parallel is None:
             num_parallel = self.model_config['num_parallel_envs']
         if train:
-            return SubprocVecEnv([self.create_env(seed, 'config.yaml') for _ in range(num_parallel)])
+            vecenv =  SubprocVecEnv([self.create_env(seed, 'config.yaml') for _ in range(num_parallel)])
         else:
-            return SubprocVecEnv([self.create_env(seed, 'config_test.yaml') for _ in range(num_parallel)])
+            vecenv = SubprocVecEnv([self.create_env(seed, 'config_test.yaml') for _ in range(num_parallel)])
         
+        #add self transposition to (C, H, W) if image observation space
+        if len(vecenv.observation_space.shape) > 1:
+            vecenv = VecTransposeImage(vecenv)
+        
+        return vecenv
 
     def create_models(self, seed: int = 0):
+        pdb.set_trace()
         if self.algorithm == "PPO":
             ppo_params = {k: v for k, v in self.model_config['ppo'].items() if v is not None}
-
+            policy_kwargs = dict(
+                net_arch = dict(pi=self.model_config['ppo_policy_kwargs']['pi_dims'], vf=self.model_config['ppo_policy_kwargs']['vf_dims']),
+                features_extractor_class = ImpalaCNN if len(self.parallel_train_env.observation_space.shape) > 1 else FlattenMLP,
+                features_extractor_kwargs = dict(features_dim = self.model_config['ppo_policy_kwargs']['features_dim'])
+            )
+            
             #NOTE: include lr schedule if needed
-            #lr_schedule = self.linear_schedule(self.model_config['learning_rate'])                
+            #lr_schedule = self.linear_schedule(self.model_config['learning_rate'])   
+            pdb.set_trace()             
             model = PPO(
                 policy=self.policy_name,
                 env=self.parallel_train_env,
                 seed=seed,
+                tensorboard_log=f"./logs/{self.algorithm}_{self.data_config['environment_name']}_tensorboard/{self.data_config['observation_space']}/seed_{seed}/",
+                policy_kwargs = policy_kwargs,
                 **ppo_params,
-                tensorboard_log=f"./logs/{self.algorithm}_{self.data_config['environment_name']}_tensorboard/{self.data_config['observation_space']}/seed_{seed}/"
             )
         elif self.algorithm == "DQN":
             dqn_params = {k: v for k, v in self.model_config['dqn'].items() if v is not None}
@@ -156,7 +172,7 @@ class PolicyHead:
 
     def train_and_evaluate_policy(self):
         wandb.init(
-            project='ssl_rl',
+            project='disent_rep',
             entity='ssl-factored-reps', 
             name=f'{self.algorithm}_{self.data_config["environment_name"]}_{self.data_config["observation_space"]}_seed_{self.seed}',
             group=f'{self.algorithm}_{self.data_config["environment_name"]}_{self.data_config["observation_space"]}',
@@ -197,6 +213,34 @@ class PolicyHead:
 
         if self.model_config['wandb_log']:
             wandb.finish()
+    
+    def evaluate_policy(self, min_seed:int, max_seed:int, transform_obs:bool, transform_func):
+        
+        #collect all rewards and dones
+        tot_rewards = []
+        tot_steps = []
+        tot_dones = []
+        
+        #iterate through all seeds and evaluate policy
+        assert max_seed >= min_seed, 'ERROR: the max_seed needs to be > min_seed'
+
+        for seed in range(min_seed, max_seed+1):
+            self.valid_env = self.create_parallel_envs(seed = seed)
+            obs = self.valid_env.reset()
+            for i in range(self.data_config['max_steps']):
+                action, _states = model.predict(obs, deterministic=True)
+                obs, rewards, dones, info = vec_env.step(action)
+
+                tot_rewards.append(sum(rewards))
+                tot_dones.append(sum(dones))
+
+                if dones:
+                    break
+            
+            tot_steps.append(i)
+            
+        return np.mean(tot_rewards), np.std(tot_rewards), np.mean(tot_dones), np.std(tot_dones), np.mean(tot_steps), np.std(tot_steps)
+        
 
 if __name__ == '__main__':
     args = argparse.ArgumentParser()
@@ -213,4 +257,6 @@ if __name__ == '__main__':
         seed=args.seed
     )
     policy_head.train_and_evaluate_policy()
+    
+
 

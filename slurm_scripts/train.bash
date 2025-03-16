@@ -2,7 +2,7 @@
 #SBATCH -n 6
 #SBATCH -N 1
 #SBATCH --mem=32G
-#SBATCH -t 24:00:00
+#SBATCH -t 10:00:00
 
 ### modify seed below
 #SBATCH --array=0-0
@@ -15,17 +15,20 @@
 
 
 source ~/.bashrc
-conda activate ssl
+conda activate ssl_new
 
 # i=`expr $SLURM_ARRAY_TASK_ID`
 # SEED=`expr $i % 5`
 # ALGO_TYPE=`expr $i / 5`
 
-SEED=$SLURM_ARRAY_TASK_ID
+SEED=6
 
 echo "SEED: $SEED"
 echo "SLURM_ARRAY_JOB_ID: $SLURM_ARRAY_JOB_ID"
 
 RUN_NAME="${SLURM_ARRAY_JOB_ID}"
 
+cd ..
+
 python -W ignore models/policy_head/policy_head.py --seed $SEED
+echo "FINISHED RUNNING SEED: $SEED"

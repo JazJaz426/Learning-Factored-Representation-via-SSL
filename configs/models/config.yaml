@@ -2,7 +2,7 @@ policy_head:
   algorithm: "PPO"  # Options: DQN, PPO, A2C
   num_models: 3
   num_parallel_envs: 4 #NOTE: log freqs have to be divisible by num_parallel_envs 
-  train_interval: 10000000
+  train_interval: 6000000
   num_eval_eps: 10
   verbose: true
   video_length: 200
@@ -12,21 +12,24 @@ policy_head:
   wandb_log: true
   normalize: true
 
+  ppo_policy_kwargs:
+    pi_dims: [128, 128]
+    vf_dims: [128, 128]
+    features_dim: 256
   ppo:
-    # n_steps: 2048
+    n_steps: 25600
     # n_epochs: 10
     # learning_rate: 0.0003
-    # batch_size: 256
-    # gamma: 0.98
+    batch_size: 64
+    gamma: 0.999
     # gae_lambda: 0.9
     # clip_range: 0.15
     # clip_range_vf: 0.65
     # # normalize_advantage: True
-    # ent_coef: 0.005
+    ent_coef: 0.01
     # max_grad_norm: 0.5
     target_kl: null
     verbose: null
-    gae_lambda: null
     seed: null
 
   dqn:

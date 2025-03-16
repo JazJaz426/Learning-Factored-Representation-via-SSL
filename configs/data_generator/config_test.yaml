@@ -1,11 +1,16 @@
 # environment_name: MiniGrid-Empty-8x8-v0 #options: [MiniGrid-DoorKey-16x16-v0, MiniGrid-FourRooms-v0, MiniGrid-LavaCrossingS11N5-v0, MiniGrid-LavaCrossingS9N3-v0, MiniGrid-Empty-5x5-v0]
-environment_name: MiniGrid-DoorKey-8x8-v0 #options: [MiniGrid-DoorKey-16x16-v0, MiniGrid-FourRooms-v0, MiniGrid-LavaCrossingS11N5-v0, MiniGrid-LavaCrossingS9N3-v0, MiniGrid-Empty-5x5-v0]
-observation_space: expert #options: [image, expert, factored]
-max_steps: 500
+environment_name: MiniGrid-BlockedUnlockPickup-v0 #options: [MiniGrid-DoorKey-16x16-v0, MiniGrid-FourRooms-v0, MiniGrid-LavaCrossingS11N5-v0, MiniGrid-LavaCrossingS9N3-v0, MiniGrid-Empty-5x5-v0]
+observation_space: image #options: [image, expert, factored]
+max_steps: 1000
+highlight: False
+
+factored_model:
+  checkpoint: ""
+  embedding_size: 512
+  model: "NatureCNN"
 
 #options: [random_rotation: [max_degrees, p], random_scaling: scalar, random_masking: [num_holes (min, max), hole_height_range (min, max), hole_width_range (min, max), probability], random_greyscale: probability, random_horz_flip: probability, random_vert_flip: probability, random_color_jitter: [brightness (min, max), contrast (min, max), saturation (min, max), hue (min, max), prob]]
 transformations: {
-  random_rotation: {limit: 60, p: 0.5, border_mode: 1},
   random_greyscale: {p: 0.5},
   random_color_jitter: {brightness: [0.7, 1.4], contrast: [0.7, 1.4], saturation: [0.7, 1.4], hue: [-0.5, 0.5]},
   random_masking: { num_holes_range: [3,3], hole_height_range: [3,5], hole_width_range: [3,5], p: 0.5 }
@@ -21,12 +26,16 @@ transformations: {
 
 
 #constant capturing all types of state attributes in the expert state
-state_attributes: [agent_pos, agent_dir, goal_pos, key_pos, door_pos, holding_key, door_locked, door_open]
-state_attribute_types: {'agent_pos': ['coordinate_width', 'coordinate_height'], 'agent_dir':['agent_dir'], 'goal_pos':['coordinate_width', 'coordinate_height'], 'key_pos':['coordinate_width', 'coordinate_height'], 'door_pos':['coordinate_width', 'coordinate_height'], 'holding_key': ['boolean'], 'door_locked':['boolean'], 'door_open':['boolean']}
+#DoorKey {'agent_pos': ['coordinate_width', 'coordinate_height'], 'agent_dir':['agent_dir'], 'goal_pos':['coordinate_width', 'coordinate_height'], 'key_pos':['coordinate_width', 'coordinate_height'], 'door_pos':['coordinate_width', 'coordinate_height'], 'holding_key': ['boolean'], 'door_locked':['boolean'], 'door_open':['boolean'], 'walls':['boolean']}
+#DoorKey: [agent_pos, agent_dir, goal_pos, key_pos, door_pos,holding_key, door_locked, door_open, walls]
+#BlockedUnlockPickup: [agent_pos, agent_dir, goal_pos, key_pos, door_pos, ball_pos, holding_key, holding_ball, door_locked, door_open, walls]
+
+state_attributes: [agent_pos, agent_dir, goal_pos, key_pos, door_pos, ball_pos, holding_key, holding_ball, door_locked, door_open, walls]
+state_attribute_types: {'agent_pos': ['coordinate_width', 'coordinate_height'], 'agent_dir':['agent_dir'], 'goal_pos':['coordinate_width', 'coordinate_height'], 'key_pos':['coordinate_width', 'coordinate_height'], 'door_pos':['coordinate_width', 'coordinate_height'], 'ball_pos': ['coordinate_width', 'coordinate_height'] , 'holding_key': ['boolean'], 'holding_ball': ['boolean'], 'door_locked':['boolean'], 'door_open':['boolean'], 'walls':['boolean']}
+normalize_state: False
 
 #options: [default, random, custom]
 reset_type: default
-
 
 #options: [agent_pos: [x,y], agent_dir: [int], goal_pos: [x,y], key_pos: [x,y], door_pos: [x,y], holding_key: true/false, door_locked: true/false, door_open: true/false]
 #agent_dir: 0 - right, 1 - down, 2 - left, 3 - up
