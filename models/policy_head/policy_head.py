@@ -1,14 +1,15 @@
+import sys
+import os
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../..')))
 import yaml
 from stable_baselines3 import PPO, DQN, A2C
 from stable_baselines3.common.monitor import Monitor
 from stable_baselines3.common.torch_layers import FlattenExtractor
-from utils.impala_cnn import ImpalaCNN
-from utils.flatten_mlp import FlattenMLP
+from models.utils.impala_cnn import ImpalaCNN
+from models.utils.flatten_mlp import FlattenMLP
 from stable_baselines3.common.vec_env import SubprocVecEnv, VecTransposeImage
 import numpy as np
-import sys
-import os
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../..')))
+
 from data.data_generator import DataGenerator
 import pdb
 from stable_baselines3.common.callbacks import CallbackList, CheckpointCallback
@@ -26,13 +27,18 @@ import argparse
 import pdb
 
 
-from custom_callbacks import CustomEvalCallback, CustomVideoRecorder, RewardValueCallback, ValuePlottingCallback
+from custom_callbacks import CustomEvalCallback, CustomVideoRecorder, RewardValueCallback, ValuePlottingCallback, SupervisedEncoderCallback
 
 
 class PolicyHead:
     def __init__(self, model_config_path, data_config_path, seed=None):
         self.model_config = self.load_config(os.path.join(os.path.dirname(__file__), '../..', model_config_path))['policy_head']
         self.data_config = self.load_config(os.path.join(os.path.dirname(__file__), '../..', data_config_path))
+        
+        self.additional_params = dict(
+            stop_gradient = True if self.model_config['representation_learner'] != 'direct' else False
+        )
+        
         self.algorithm = self.model_config['algorithm']
         self.data_type = self.data_config['observation_space']
         self.policy_name = self.select_policy()
@@ -127,24 +133,27 @@ class PolicyHead:
         return vecenv
 
     def create_models(self, seed: int = 0):
-        pdb.set_trace()
         if self.algorithm == "PPO":
             ppo_params = {k: v for k, v in self.model_config['ppo'].items() if v is not None}
+
+            #TODO: maybe make this more elegant?
+            expert_obs = self.dummy_env.expert_observation_space
+
+            
             policy_kwargs = dict(
                 net_arch = dict(pi=self.model_config['ppo_policy_kwargs']['pi_dims'], vf=self.model_config['ppo_policy_kwargs']['vf_dims']),
                 features_extractor_class = ImpalaCNN if len(self.parallel_train_env.observation_space.shape) > 1 else FlattenMLP,
-                features_extractor_kwargs = dict(features_dim = self.model_config['ppo_policy_kwargs']['features_dim'])
+                features_extractor_kwargs = dict(features_dim = self.model_config['ppo_policy_kwargs']['features_dim'], vector_size_per_factor = self.model_config['vector_size_per_factor'], expert_obs = expert_obs, stop_gradient = self.additional_params['stop_gradient'])
             )
             
             #NOTE: include lr schedule if needed
             #lr_schedule = self.linear_schedule(self.model_config['learning_rate'])   
-            pdb.set_trace()             
             model = PPO(
                 policy=self.policy_name,
                 env=self.parallel_train_env,
                 seed=seed,
                 tensorboard_log=f"./logs/{self.algorithm}_{self.data_config['environment_name']}_tensorboard/{self.data_config['observation_space']}/seed_{seed}/",
-                policy_kwargs = policy_kwargs,
+                # policy_kwargs = policy_kwargs,
                 **ppo_params,
             )
         elif self.algorithm == "DQN":
@@ -172,7 +181,7 @@ class PolicyHead:
 
     def train_and_evaluate_policy(self):
         wandb.init(
-            project='disent_rep',
+            project='disentangled_rep',
             entity='ssl-factored-reps', 
             name=f'{self.algorithm}_{self.data_config["environment_name"]}_{self.data_config["observation_space"]}_seed_{self.seed}',
             group=f'{self.algorithm}_{self.data_config["environment_name"]}_{self.data_config["observation_space"]}',
@@ -181,7 +190,8 @@ class PolicyHead:
             config={
                 "model": self.model_config,
                 "data": self.data_config,
-                "seed": self.seed
+                "seed": self.seed,
+                "num_parallel_envs": self.model_config['num_parallel_envs']
             }
         )
         train_interval = self.model_config['train_interval']
@@ -202,14 +212,21 @@ class PolicyHead:
         reward_eval_callback = CustomEvalCallback("eval", eval_env=self.eval_env, n_eval_episodes=self.model_config['num_eval_eps'], eval_freq=self.model_config['reward_log_freq'], deterministic = True, log_path = f"./logs/{self.algorithm}_{self.data_config['environment_name']}_tensorboard/{self.data_config['observation_space']}/seed_{self.seed}/", best_model_save_path = None)
        
         # VecVideoRecorder is used instead of GifLoggingCallback
-        value_callback = ValuePlottingCallback(env = self.dummy_env, save_freq = self.model_config['video_log_freq'], log_dir = f"./logs/{self.algorithm}_{self.data_config['environment_name']}_policyviz/{self.data_config['observation_space']}/seed_{self.seed}/", num_envs= self.model_config['num_parallel_envs'], name_prefix = f'{self.policy_name}_policy_value')
+        value_callback = ValuePlottingCallback(env = self.dummy_env, save_freq = self.model_config['video_log_freq']//self.model_config['num_parallel_envs'], log_dir = f"./logs/{self.algorithm}_{self.data_config['environment_name']}_policyviz/{self.data_config['observation_space']}/seed_{self.seed}/", num_envs= self.model_config['num_parallel_envs'], name_prefix = f'{self.policy_name}_policy_value')
         checkpoint_callback = CheckpointCallback(save_freq=self.model_config['save_weight_freq']//self.model_config['num_parallel_envs'], save_path=f"./logs/{self.algorithm}_{self.data_config['environment_name']}_weights/{self.data_config['observation_space']}/seed_{self.seed}/", name_prefix=f'{self.algorithm}_seed{self.seed}_step', save_replay_buffer=True)
 
+        
+        
 
         # Create the callback list
-        callback = CallbackList([reward_validation_callback, reward_eval_callback, value_callback, checkpoint_callback])
+        callbacks = CallbackList([reward_validation_callback, reward_eval_callback, value_callback, checkpoint_callback])
         
-        self.model.learn(total_timesteps=train_interval, tb_log_name=f'{self.algorithm}_{self.seed}', progress_bar = True, reset_num_timesteps=False, callback = callback)
+        #If using supervised learning or our approach, create separet SupervisedEncoderCallback for supervised learning approach
+        if self.model_config['representation_learner'] == 'supervised':
+            supervised_encoder_callback = SupervisedEncoderCallback(custom_name = "supervised")
+            callbacks.callbacks.append(supervised_encoder_callback)
+
+        self.model.learn(total_timesteps=train_interval, tb_log_name=f'{self.algorithm}_{self.seed}', progress_bar = True, reset_num_timesteps=False, callback = callbacks)
 
         if self.model_config['wandb_log']:
             wandb.finish()

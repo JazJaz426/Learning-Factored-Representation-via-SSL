@@ -14,6 +14,7 @@ from matplotlib import pyplot as plt
 import gymnasium as gym
 import pandas as pd 
 import pdb
+import torch
 
 #NOTE: for older RewardValueCallback used as global variable building CSV
 csv_logger = pd.DataFrame(columns=['train/test', 'step', 'seed', 'cumul_reward'])
@@ -90,6 +91,7 @@ class CustomEvalCallback(EvalCallback):
 
         #[SR] divided by self.eval_env.num_envs for periodic logging
         if self.eval_freq > 0 and (self.n_calls % (self.eval_freq // self.eval_env.num_envs))== 0:
+            
             # Sync training and eval env if there is VecNormalize
             if self.model.get_vec_normalize_env() is not None:
                 try:
@@ -355,3 +357,100 @@ class RewardValueCallback(BaseCallback):
     
     def _on_training_end(self):
         self.writer.close()
+
+
+
+class SupervisedEncoderCallback(BaseCallback):
+    """
+    Callback for training the encoder with a supervised objective
+    directly using PPO's rollout buffer.
+    """
+    def __init__(
+        self, 
+        custom_name: str,
+        update_freq: int = 256,
+        batch_size: int = 256,
+        learning_rate: float = 5e-5,
+        verbose: int = 0,
+    ):
+        super(SupervisedEncoderCallback, self).__init__(verbose)
+        self.update_freq = update_freq
+        self.batch_size = batch_size
+        self.learning_rate = learning_rate
+        self.steps_since_update = 0
+
+        #custom naming for logged metric (i.e. loss)
+        self.custom_name = custom_name
+
+        #create the reference features_extractor model, loss function and optimizer
+        self._init_callback()
+        
+    def _init_callback(self) -> None:
+        
+        #defin the loss function to use during training
+        self.loss_fn = torch.nn.CrossEntropyLoss()
+        
+        # Bring the features_extractor to the right device and create an optimizer for the model
+        self.model.policy.features_extractor.to(self.model.device)
+        self.optimizer = torch.optim.Adam(
+            self.model.policy.features_extractor.parameters(),
+            lr=self.learning_rate
+        )
+        
+    def _on_step(self) -> bool:
+        self.steps_since_update += 1
+        
+        # Perform supervised update at specified frequency
+        # and only after buffer has been filled at least once
+        if (self.steps_since_update >= self.update_freq and 
+            hasattr(self.model, 'rollout_buffer') and 
+            self.model.rollout_buffer is not None and
+            self.model.rollout_buffer.full):
+            
+            self._update_features_extractor_from_buffer()
+            self.steps_since_update = 0
+            
+        return True
+    
+    def _update_features_extractor_from_buffer(self):
+        """Train the encoder using data from PPO's rollout buffer"""
+        # Get the rollout buffer
+        buffer = self.model.rollout_buffer
+        
+        # Check if the buffer has info dicts with labels we need
+        if not hasattr(buffer, 'infos') or len(buffer.infos) == 0:
+            return
+        
+        # Extract observations and info from buffer
+        # For simplicity, let's use the first batch_size elements
+        buffer_size = len(buffer.observations)
+        indices = np.random.randint(0, buffer_size, size=min(self.batch_size, buffer_size))
+        
+        # Get observations
+        observations = buffer.observations[indices]
+        
+        # Extract labels from infos (e.g., agent position)
+        labels = []
+        for idx in indices:
+            labels.append(None)
+        
+        # Convert to tensors
+        obs_tensor = torch.as_tensor(observations).float().to(self.model.device)
+        #NOTE: needs to be 1-hot encoded vectors for the label
+        label_features = torch.FloatTensor(labels).to(self.model.device)
+        
+        # Forward pass
+        with torch.set_grad_enabled(True):
+            pred_features = self.model.policy.features_extractor(obs_tensor)
+            
+            loss = sum([self.loss_fn(pred, label) for pred, label in zip(pred_features, label_features)]) / len(pred_features)
+            
+        # Backward pass and optimization
+        self.optimizer.zero_grad()
+        self.prediction_optimizer.zero_grad()
+        loss.backward()
+        self.optimizer.step()
+        self.prediction_optimizer.step()
+        
+        # Log the loss during training features extractor
+        self.logger.record(f"supervised/{self.custom_name}/loss", float(loss.item()))
