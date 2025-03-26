@@ -147,7 +147,6 @@ class DataGenerator(gym.Env):
 
     def _create_observation_space(self, state_attribute_types):
         #return the desired gym Spaces based on the observation space
-
         if self.observation_type == 'image':
             frame = self.env.unwrapped.get_frame(tile_size=8)
             return gym.spaces.Box(low=0, high=255, shape=frame.shape, dtype=np.uint8), self._create_expert_observation_space(state_attribute_types)
@@ -221,9 +220,9 @@ class DataGenerator(gym.Env):
 
         info['dist_goal'] = abs(state['agent_pos'][0]-state['goal_pos'][0]) + abs(state['agent_pos'][1]-state['goal_pos'][1])
 
-        #NOTE: newly added, modify reward to be step-penalty function
-        #reward = 1 - ((abs(state['agent_pos'][0]-state['goal_pos'][0])+abs(state['agent_pos'][1]-state['goal_pos'][1]))/(self.env.unwrapped.height + self.env.unwrapped.width))
-
+        
+        #NOTE: replace with 0-1 reward function -- avoid accumulation of discounted reward (very small when reaching the goal)
+        reward = 1.0 if reward > 0 else 0.0
 
         
 

@@ -4,8 +4,8 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../..')
 import yaml
 from stable_baselines3 import PPO, DQN, A2C
 from stable_baselines3.common.monitor import Monitor
-from stable_baselines3.common.torch_layers import FlattenExtractor
-from models.utils.impala_cnn import ImpalaCNN
+from stable_baselines3.common.torch_layers import NatureCNN, FlattenExtractor
+from models.utils.impala_cnn import ImpalaCNNLarge, ImpalaCNNSmall
 from models.utils.flatten_mlp import FlattenMLP
 from stable_baselines3.common.vec_env import SubprocVecEnv, VecTransposeImage
 import numpy as np
@@ -142,7 +142,7 @@ class PolicyHead:
             
             policy_kwargs = dict(
                 net_arch = dict(pi=self.model_config['ppo_policy_kwargs']['pi_dims'], vf=self.model_config['ppo_policy_kwargs']['vf_dims']),
-                features_extractor_class = ImpalaCNN if len(self.parallel_train_env.observation_space.shape) > 1 else FlattenMLP,
+                features_extractor_class = ImpalaCNNSmall if len(self.parallel_train_env.observation_space.shape) > 1 else FlattenMLP,
                 features_extractor_kwargs = dict(features_dim = self.model_config['ppo_policy_kwargs']['features_dim'], vector_size_per_factor = self.model_config['vector_size_per_factor'], expert_obs = expert_obs, stop_gradient = self.additional_params['stop_gradient'])
             )
             
@@ -153,7 +153,7 @@ class PolicyHead:
                 env=self.parallel_train_env,
                 seed=seed,
                 tensorboard_log=f"./logs/{self.algorithm}_{self.data_config['environment_name']}_tensorboard/{self.data_config['observation_space']}/seed_{seed}/",
-                # policy_kwargs = policy_kwargs,
+                policy_kwargs = policy_kwargs,
                 **ppo_params,
             )
         elif self.algorithm == "DQN":
