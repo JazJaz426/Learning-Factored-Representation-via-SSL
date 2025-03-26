@@ -74,7 +74,8 @@ class DataGenerator(gym.Env):
         self.normalize_state = configs['normalize_state']
 
         # Create the environment
-        self.env = gym.make(configs['environment_name'], render_mode='rgb_array')
+        self.env = gym.make(configs['environment_name'], render_mode='rgb_array', max_episode_steps = configs['max_steps'], max_steps=configs['max_steps'])
+
         # Remove the white background from the visual environment
         self.highlight = configs['highlight']
 
@@ -82,9 +83,7 @@ class DataGenerator(gym.Env):
         self.env = FullyObsWrapper(self.env)
         self.env = ImgObsWrapper(self.env)
 
-        # self.env.max_steps = configs['max_steps']
-        self.env = TimeLimit(self.env, max_episode_steps=configs['max_steps'])
-
+        
         # Wrap the environment to enable stochastic actions
         if configs['deterministic_action'] is False:
             self.env = StochasticActionWrapper(env=self.env, prob=configs['action_stochasticity'])
@@ -395,7 +394,7 @@ if __name__ == '__main__':
 
     pdb.set_trace()
 
-    max_steps = 100
+    max_steps = 1000
     step = 0
 
     base_path = os.path.join('./temp/')
@@ -403,13 +402,16 @@ if __name__ == '__main__':
 
     while step < max_steps:
 
-        act = int(input('Action: '))
+        # act = int(input('Action: '))
+        act = data_generator.action_space.sample()
 
         obs, rew, term, trunc, info = data_generator.step(act)
         
         print('REWARD: ', rew)
         print('TERM: ', term)
-
+        if trunc:
+            print("TRUNCATED EARLY")
+            pdb.set_trace()
         img = Image.fromarray(info['obs'])
         img.save(os.path.join(base_path, f'step_{step}.png'))
 
