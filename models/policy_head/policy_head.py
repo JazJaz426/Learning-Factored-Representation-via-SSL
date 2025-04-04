@@ -27,7 +27,7 @@ import argparse
 import pdb
 
 
-from custom_callbacks import CustomEvalCallback, CustomVideoRecorder, RewardValueCallback, ValuePlottingCallback, SupervisedEncoderCallback
+from custom_callbacks import CustomEvalCallback, CustomVideoRecorder, RewardValueCallback, ValuePlottingCallback, SupervisedEncoderCallback, SelfSupervisedCovEncoderCallback, SelfSupervisedMaskEncoderCallback
 
 
 class PolicyHead:
@@ -35,9 +35,10 @@ class PolicyHead:
         self.model_config = self.load_config(os.path.join(os.path.dirname(__file__), '../..', model_config_path))['policy_head']
         self.data_config = self.load_config(os.path.join(os.path.dirname(__file__), '../..', data_config_path))
         
-        self.additional_params = dict(
-            stop_gradient = True if self.model_config['representation_learner'] != 'direct' else False
-        )
+        # self.additional_params = dict(
+        #     representation_learner = self.model_config['representation_learner'] =='supervised' else False,
+        #     factored = True if self.model_config['representation_learner'] == 'factored' else False
+        # )
         
         self.algorithm = self.model_config['algorithm']
         self.data_type = self.data_config['observation_space']
@@ -143,7 +144,7 @@ class PolicyHead:
             policy_kwargs = dict(
                 net_arch = dict(pi=self.model_config['ppo_policy_kwargs']['pi_dims'], vf=self.model_config['ppo_policy_kwargs']['vf_dims']),
                 features_extractor_class = ImpalaCNNSmall if len(self.parallel_train_env.observation_space.shape) > 1 else FlattenMLP,
-                features_extractor_kwargs = dict(features_dim = self.model_config['ppo_policy_kwargs']['features_dim'], vector_size_per_factor = self.model_config['vector_size_per_factor'], expert_obs = expert_obs, stop_gradient = self.additional_params['stop_gradient'])
+                features_extractor_kwargs = dict(features_dim = self.model_config['ppo_policy_kwargs']['features_dim'], vector_size_per_factor = self.model_config['vector_size_per_factor'], expert_obs = expert_obs, representation_learner = self.model_config['representation_learner'])
             )
             
             #NOTE: include lr schedule if needed
@@ -221,10 +222,21 @@ class PolicyHead:
         # Create the callback list
         callbacks = CallbackList([reward_validation_callback, reward_eval_callback, value_callback, checkpoint_callback])
         
-        #If using supervised learning or our approach, create separet SupervisedEncoderCallback for supervised learning approach
+        #If using supervised learning or our approach, create separate SupervisedEncoderCallback for supervised learning approach
         if self.model_config['representation_learner'] == 'supervised':
             supervised_encoder_callback = SupervisedEncoderCallback(custom_name = "supervised")
             callbacks.callbacks.append(supervised_encoder_callback)
+        
+        #If using supervised learning or our approach, create separate SupervisedEncoderCallback for supervised learning approach
+        if self.model_config['representation_learner'] == 'ssl_cov':
+            supervised_encoder_callback = SelfSupervisedCovEncoderCallback(custom_name = "ssl_covariance")
+            callbacks.callbacks.append(supervised_encoder_callback)
+
+        #If using supervised learning or our approach, create separate SupervisedEncoderCallback for supervised learning approach
+        if self.model_config['representation_learner'] == 'ssl_mask':
+            supervised_encoder_callback = SelfSupervisedMaskEncoderCallback(custom_name = "ssl_mask")
+            callbacks.callbacks.append(supervised_encoder_callback)
+        
 
         self.model.learn(total_timesteps=train_interval, tb_log_name=f'{self.algorithm}_{self.seed}', progress_bar = True, reset_num_timesteps=False, callback = callbacks)
 

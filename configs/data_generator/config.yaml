@@ -1,6 +1,6 @@
-# environment_name: MiniGrid-Empty-8x8-v0 #options: [MiniGrid-DoorKey-16x16-v0, MiniGrid-FourRooms-v0, MiniGrid-LavaCrossingS11N5-v0, MiniGrid-LavaCrossingS9N3-v0, MiniGrid-Empty-5x5-v0]
-environment_name: MiniGrid-BlockedUnlockPickup-v0 #options: [MiniGrid-DoorKey-16x16-v0, MiniGrid-FourRooms-v0, MiniGrid-LavaCrossingS11N5-v0, MiniGrid-LavaCrossingS9N3-v0, MiniGrid-Empty-5x5-v0]
-observation_space: image #options: [image, expert, factored]
+environment_name: MiniGrid-DoorKey-8x8-v0 #options: [MiniGrid-DoorKey-16x16-v0, MiniGrid-FourRooms-v0, MiniGrid-LavaCrossingS11N5-v0, MiniGrid-LavaCrossingS9N3-v0, MiniGrid-Empty-5x5-v0]
+# environment_name: MiniGrid-BlockedUnlockPickup-v0 #options: [MiniGrid-DoorKey-16x16-v0, MiniGrid-FourRooms-v0, MiniGrid-LavaCrossingS11N5-v0, MiniGrid-LavaCrossingS9N3-v0, MiniGrid-Empty-5x5-v0]
+observation_space: image #options: [image, expert]
 max_steps: 1000
 highlight: False
 
@@ -29,8 +29,8 @@ transformations: {
 #DoorKey: [agent_pos, agent_dir, goal_pos, key_pos, door_pos,holding_key, door_locked, door_open, walls]
 #BlockedUnlockPickup: [agent_pos, agent_dir, goal_pos, key_pos, door_pos, ball_pos, holding_key, holding_obj, door_locked, door_open, walls]
 
-state_attributes: [agent_pos, agent_dir, goal_pos, key_pos, door_pos, ball_pos, holding_key, holding_ball, door_locked, door_open, walls]
-state_attribute_types: {'agent_pos': ['coordinate_width', 'coordinate_height'], 'agent_dir':['agent_dir'], 'goal_pos':['coordinate_width', 'coordinate_height'], 'key_pos':['coordinate_width', 'coordinate_height'], 'door_pos':['coordinate_width', 'coordinate_height'], 'ball_pos': ['coordinate_width', 'coordinate_height'] , 'holding_key': ['boolean'], 'holding_ball': ['boolean'], 'door_locked':['boolean'], 'door_open':['boolean'], 'walls':['boolean']}
+state_attributes: [agent_pos, agent_dir, key_pos, holding_key, door_pos, door_locked, door_open, goal_pos]
+state_attribute_types: {'agent_pos': ['coordinate_width', 'coordinate_height'], 'agent_dir':['agent_dir'], 'goal_pos':['coordinate_width', 'coordinate_height'], 'key_pos':['coordinate_width', 'coordinate_height'], 'door_pos':['coordinate_width', 'coordinate_height'], 'ball_pos': ['coordinate_width', 'coordinate_height'] , 'holding_key': ['boolean'], 'holding_ball': ['boolean'], 'door_locked':['boolean'], 'door_open':['boolean']}
 normalize_state: False
 
 #options: [default, random, custom]
@@ -54,6 +54,9 @@ deterministic_action: true
 
 #options: float between 0-1.0
 action_stochasticity: 0.9
+
+#options: true/false
+exploration_bonus: True
 
 #options: false / true
 record_video: false

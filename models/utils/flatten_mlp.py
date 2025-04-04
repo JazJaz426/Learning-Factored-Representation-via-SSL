@@ -6,6 +6,8 @@ from stable_baselines3.common.preprocessing import get_flattened_obs_dim
 import pdb
 import torch.nn.functional as F
 from typing import Optional
+from models.learning_head.self_supervised_head import SelfSupervisedLearner, SelfSupervisedLearner2
+from models.learning_head.supervised_head import SupervisedLearner
 
 class FlattenMLP(BaseFeaturesExtractor):
     """
@@ -26,12 +28,19 @@ class FlattenMLP(BaseFeaturesExtractor):
             
 
         self.mlp_layers = nn.Sequential(
-            nn.Linear(dim_flatten, 512),
+            nn.Linear(dim_flatten, 64),
             nn.ReLU(),
-            nn.Linear(512, features_dim),
+            nn.Linear(64, 32),
             nn.ReLU(),
-            nn.Linear(features_dim, features_dim)
+            nn.Linear(32, features_dim)
         )
+
+        self.learning_head = learning_head
+
+        if self.learning_head is not None:
+
+
+        
 
     def forward(self, observations: torch.Tensor) -> torch.Tensor:
         
