@@ -6,6 +6,7 @@ from minigrid.minigrid_env import MiniGridEnv
 from minigrid.core.world_object import Door, Goal, Key, Box, Ball
 from minigrid.wrappers import ImgObsWrapper
 from minigrid.wrappers import FullyObsWrapper
+from minigrid.wrappers import ActionBonus
 from gymnasium.wrappers import TimeLimit
 from collections.abc import Iterable
 import yaml
@@ -87,6 +88,10 @@ class DataGenerator(gym.Env):
         # Wrap the environment to enable stochastic actions
         if configs['deterministic_action'] is False:
             self.env = StochasticActionWrapper(env=self.env, prob=configs['action_stochasticity'])
+        
+        # Wrap the environment to enable exploration bonus if needed
+        if configs['exploration_bonus'] is True:
+            self.env = ActionBonus(env = self.env)
 
         #Store the controlled factors array
         self.controlled_factors = configs['controlled_factors']
@@ -259,6 +264,8 @@ class DataGenerator(gym.Env):
         info['original_obs'] = frame
 
         #apply image transformations if needed
+        if not isinstance(frame, np.ndarray):
+            raise TypeError(f"Expected NumPy array, but got {type(frame)}")
         frame = self.data_augmentor.apply_transformation(frame)
         
         state, norm_state_array = self._construct_state()

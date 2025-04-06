@@ -12,15 +12,16 @@ policy_head:
   wandb_log: true
   normalize: true
 
-  representation_learner: 'direct' #options [direct, supervised, ssl-cov, ssl-mask, dreamerv2] etc...
+  learning_head: 'ssl-cov' #options [direct, supervised, ssl-cov, ssl-mask, dreamerv2] etc...
 
-  #configs only for supervised
+  #configs only for supervised and ssl methods
   vector_size_per_factor: 4
+  num_factors: 10
 
   ppo_policy_kwargs:
     pi_dims: [64, 128]
     vf_dims: [64, 128]
-    features_dim: 256
+    backbone_dim: 256
   ppo:
     # n_steps: 200
     # n_epochs: 10

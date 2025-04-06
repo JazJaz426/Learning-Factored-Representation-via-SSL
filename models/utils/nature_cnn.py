@@ -30,6 +30,7 @@ class NatureCNN(BaseFeaturesExtractor):
         self,
         observation_space: gym.Space,
         features_dim: int = 512,
+        backbone_dim: int = 512,
         vector_size_per_factor:int = None,
         expert_obs: gym.Space= None,
         num_factors: int = None,
@@ -41,6 +42,7 @@ class NatureCNN(BaseFeaturesExtractor):
             f"observation space, not {observation_space}",
         )
         super().__init__(observation_space, features_dim)
+
         # We assume CxHxW images (channels first)
         # Re-ordering will be done by pre-preprocessing or wrapper
         assert is_image_space(observation_space, check_channels=False, normalized_image=normalized_image), (
@@ -54,7 +56,10 @@ class NatureCNN(BaseFeaturesExtractor):
             "you should pass `normalize_images=False`: \n"
             "https://stable-baselines3.readthedocs.io/en/master/guide/custom_env.html"
         )
+
         n_input_channels = observation_space.shape[0]
+        output_dims = expert_obs.high
+
         self.cnn = nn.Sequential(
             nn.Conv2d(n_input_channels, 32, kernel_size=8, stride=4, padding=0),
             nn.ReLU(),
@@ -69,12 +74,10 @@ class NatureCNN(BaseFeaturesExtractor):
         with th.no_grad():
             n_flatten = self.cnn(th.as_tensor(observation_space.sample()[None]).float()).shape[1]
 
-        self.linear = nn.Sequential(nn.Linear(n_flatten, features_dim), nn.ReLU())
-
-        output_dims = expert_obs.high
+        self.linear = nn.Sequential(nn.Linear(n_flatten, backbone_dim), nn.ReLU())
 
         learning_heads = {'supervised': SupervisedLearner, 'ssl-cov':SelfSupervisedCovLearner, 'ssl-mask':SelfSupervisedMaskLearner}
-        self.learning_head = None if learning_head is None else learning_heads[learning_head](features_dim=features_dim, vector_size_per_factor=vector_size_per_factor, num_factors= output_dims if learning_head == 'supervised' else num_factors)
+        self.learning_head = None if learning_head is None or learning_head not in learning_heads else learning_heads[learning_head](backbone_dim=backbone_dim, vector_size_per_factor=vector_size_per_factor, num_factors=output_dims if learning_head == 'supervised' else num_factors)
 
     def forward(self, x: th.Tensor, test:bool=True) -> th.Tensor:
         

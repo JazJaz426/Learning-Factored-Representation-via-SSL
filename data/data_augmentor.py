@@ -1,5 +1,8 @@
+import os
+os.environ["NO_ALBUMENTATIONS_UPDATE"] = "1"
 import albumentations as A
 import random
+import pdb
 
 class DataAugmentor():
 
@@ -31,9 +34,7 @@ class DataAugmentor():
 
     def apply_transformation(self, image):
         #apply the composed transfomration based on the sequence transformations
-
         augmented = self.composed_transformation(image=image)
-        
         return augmented['image']
 
 

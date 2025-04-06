@@ -21,7 +21,7 @@ conda activate ssl_new
 # SEED=`expr $i % 5`
 # ALGO_TYPE=`expr $i / 5`
 
-SEED=6
+SEED=0
 
 echo "SEED: $SEED"
 echo "SLURM_ARRAY_JOB_ID: $SLURM_ARRAY_JOB_ID"
