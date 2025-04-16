@@ -157,7 +157,7 @@ class ImpalaCNNSmall(BaseFeaturesExtractor):
         
         self.fc = nn.Linear(n_flatten, backbone_dim)
 
-        learning_heads = {'supervised': SupervisedLearner, 'ssl-cov':SelfSupervisedCovLearner, 'ssl-cov-ik':SelfSupervisedCovIKLearner, 'ssl-mask':SelfSupervisedMaskLearner, 'ssl-mask-reconstr':SelfSupervisedMaskReconstrLearner}
+        learning_heads = {'supervised': SupervisedLearner, 'ssl-cov':SelfSupervisedCovLearner, 'ssl-cov-ik':SelfSupervisedCovIKLearner, 'ssl-mask':SelfSupervisedMaskLearner, 'ssl-mask-reconst':SelfSupervisedMaskReconstrLearner}
         self.learning_head = None if learning_head is None or learning_head not in learning_heads else learning_heads[learning_head](backbone_dim=backbone_dim, vector_size_per_factor=vector_size_per_factor, num_factors=output_dims if learning_head == 'supervised' else num_factors, num_actions = num_actions)
 
 
