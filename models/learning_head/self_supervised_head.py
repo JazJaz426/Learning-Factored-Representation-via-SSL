@@ -57,8 +57,7 @@ class SelfSupervisedCovIKLearner(nn.Module):
     
 
     def forward(self, x: torch.Tensor, actions:Optional[torch.Tensor] = None, test:bool=True)->torch.Tensor:
-        
-        
+
         #if in eval mode: used for PPO policy learning => then detach computation and return representation as is 
         if test:
 
@@ -257,6 +256,7 @@ class SelfSupervisedMaskReconstrLearner(nn.Module):
             
         #if in train mode: used for SSL representation learning ==> then do not detach computation and return both covariance and next state prediction
         else:
+            pdb.set_trace()
             x_proj = self.act(self.factor_scale_proj(x)) #should be: (batch size, num factors*vec per factor)
             x_curr = x_proj.reshape(x_proj.shape[0], self.num_factors, self.vector_size_per_factor) #should be: (batch size, num factors, vec per factor)
 

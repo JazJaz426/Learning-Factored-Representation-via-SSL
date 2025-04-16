@@ -194,7 +194,6 @@ class CustomEvalCallback(EvalCallback):
 
         return continue_training
 
-
 class ValuePlottingCallback(BaseCallback):
 
     def __init__(self, env: gym.Env, save_freq: int, log_dir: str, num_envs: int, name_prefix: str = "", verbose=1):
@@ -283,9 +282,6 @@ class ValuePlottingCallback(BaseCallback):
     def _on_training_end(self):
         plt.close()
 
-
-
-#NOTE: RewardValueCallback is not used
 
 class RewardValueCallback(BaseCallback):
     def __init__(self, env: gym.Env, save_freq: int, log_dir: str, csv_log_dir: str, num_envs:int, verbose=0, train=True):
@@ -520,7 +516,7 @@ class SelfSupervisedMaskReconstrEncoderCallback(BaseCallback):
         else:
             for env in range(len(self.locals['infos'])):
                 self.observation_buffer.append(torch.Tensor(self.locals['infos'][env]['obs']).permute(2, 0, 1))
-                self.action_buffer.append(torch.Tensor(self.locals['infos'][env]['action']))
+                self.action_buffer.append(self.locals['infos'][env]['action'])
         return True
     
     def _update_features_extractor_from_buffer(self):
@@ -530,12 +526,12 @@ class SelfSupervisedMaskReconstrEncoderCallback(BaseCallback):
             return 
                 
         observations = torch.stack(self.observation_buffer)
-        actions = torch.stack(self.action_buffer)
+        actions = torch.Tensor(self.action_buffer)
         buffer_size = len(observations)
         
         # Convert to tensors
         observations = torch.as_tensor(observations).float().to(self.model.device)
-        actions = torch.as_tensor(actions).float().to(self.model.device)
+        actions = torch.as_tensor(actions, dtype=torch.long).to(self.model.device)[:-1]
         
         # Forward pass
         with torch.set_grad_enabled(True):
@@ -549,10 +545,13 @@ class SelfSupervisedMaskReconstrEncoderCallback(BaseCallback):
             #NOTE: skip first obs in obs_tensor since we cannot forecast that
             same_label = torch.ones((same_state.shape[0], 1)) 
             reconstr_same = self.reconstr_loss(same_state, same_label)
+            same_acc = sum((torch.argmax(reconstr_same, axis=-1) == same_label).float())/reconstr_same.shape[0]
+
             #loss 3: state-transition prediction i.e. successive or not successive states
-            diff_label = torch.ones((diff_state.shape[0], 0)) 
+            diff_label = torch.zeros((diff_state.shape[0], 1)) 
             reconstr_diff = self.reconstr_loss(diff_state, diff_label)
-            
+            diff_acc = sum((torch.argmax(reconstr_diff, axis=-1) == same_label).float())/reconstr_diff.shape[0]
+        
             total_loss = self.alpha_frob  * frob_loss/frob_loss.detach() + self.alpha_same * reconstr_same/reconstr_same.detach() +  self.alpha_diff * reconstr_diff/reconstr_diff.detach()
 
         # backward pass and optimization
@@ -565,6 +564,8 @@ class SelfSupervisedMaskReconstrEncoderCallback(BaseCallback):
         self.logger.record(f"self-supervised/{self.custom_name}/frob_loss", float(frob_loss.item()))
         self.logger.record(f"self-supervised/{self.custom_name}/same_loss", float(reconstr_same.item()))
         self.logger.record(f"self-supervised/{self.custom_name}/diff_loss", float(reconstr_diff.item()))
+        self.logger.record(f"self-supervised/{self.custom_name}/same_acc", float(same_acc.item()))
+        self.logger.record(f"self-supervised/{self.custom_name}/diff_acc", float(diff_acc.item()))
 
 
 class SelfSupervisedCovIKEncoderCallback(BaseCallback):
@@ -650,9 +651,9 @@ class SelfSupervisedCovIKEncoderCallback(BaseCallback):
         
         # Forward pass
         with torch.set_grad_enabled(True):
-            pdb.set_trace()
+            
             batch_cov, action_distrib, thresholded_diff = self.model.policy.features_extractor(observations, test=False)
-            pdb.set_trace()
+
             #loss 1: batch covariance close to identity (i.e. Frobenius Norm or Barlow Twins like)
             identity = torch.eye(batch_cov.shape[0], device=self.model.device)
             frob_loss = torch.norm(batch_cov - identity, p='fro')
@@ -666,9 +667,9 @@ class SelfSupervisedCovIKEncoderCallback(BaseCallback):
 
             for i in range(action_distrib.shape[1]):
                 ik_loss += self.action_pred_loss(action_distrib[:,i, :], actions)
-                ik_accuracy += sum((pred_action[:,i] == actions).float())
-            ik_loss /= (action_distrib.shape[0]*action_distrib.shape[1])
-            ik_accuracy /= (action_distrib.shape[0]*action_distrib.shape[1])
+                ik_accuracy += sum((pred_action[:,i] == actions).float())/pred_action.shape[0]
+            ik_loss /= (action_distrib.shape[1])
+            ik_accuracy /= (action_distrib.shape[1])
             
 
             #loss 3: additional loss to enforce few number of changing factors
@@ -785,7 +786,7 @@ class SelfSupervisedCovEncoderCallback(BaseCallback):
             l1_reg = 0.0
             for name, param in self.model.policy.features_extractor.learning_head.transition_proj.named_parameters():
                 if 'weight' in name:
-                    l1_reg += torch.norm(param, 1)
+                    l1_reg += torch.sum(torch.abs(param))
             
             total_loss = self.alpha_frob * frob_loss/frob_loss.detach() + self.alpha_reconstr * reconstr_loss/reconstr_loss.detach() + self.alpha_l1 * l1_reg/l1_reg.detach()
 
@@ -888,8 +889,8 @@ class SupervisedEncoderCallback(BaseCallback):
             for i, feat in enumerate(pred_features):
                 loss += self.loss_fn(feat, labels[:,i])
                 accuracy += (preds == labels).float().mean()
-            loss /= (pred_features[0].shape[0]*len(pred_features))
-            accuracy /= (pred_features[0].shape[0]*len(pred_features))
+            loss /= (len(pred_features))
+            accuracy /= (len(pred_features))
         
         # Backward pass and optimization
         self.optimizer.zero_grad()
