@@ -532,6 +532,7 @@ class SelfSupervisedMaskReconstrEncoderCallback(BaseCallback):
         # Convert to tensors
         observations = torch.as_tensor(observations).float().to(self.model.device)
         actions = torch.as_tensor(actions, dtype=torch.long).to(self.model.device)[:-1]
+
         
         # Forward pass
         with torch.set_grad_enabled(True):
@@ -543,14 +544,14 @@ class SelfSupervisedMaskReconstrEncoderCallback(BaseCallback):
 
             #loss 2: state-transition prediction i.e. successive or not successive states
             #NOTE: skip first obs in obs_tensor since we cannot forecast that
-            same_label = torch.ones((same_state.shape[0], 1)) 
+            same_label = torch.ones((same_state.shape[0], ), device=self.model.device, dtype=torch.long) 
             reconstr_same = self.reconstr_loss(same_state, same_label)
-            same_acc = sum((torch.argmax(reconstr_same, axis=-1) == same_label).float())/reconstr_same.shape[0]
+            same_acc = sum((torch.argmax(reconstr_same, axis=-1) == same_label).float())/same_state.shape[0]
 
             #loss 3: state-transition prediction i.e. successive or not successive states
-            diff_label = torch.zeros((diff_state.shape[0], 1)) 
+            diff_label = torch.zeros((diff_state.shape[0], ), device=self.model.device, dtype=torch.long) 
             reconstr_diff = self.reconstr_loss(diff_state, diff_label)
-            diff_acc = sum((torch.argmax(reconstr_diff, axis=-1) == same_label).float())/reconstr_diff.shape[0]
+            diff_acc = sum((torch.argmax(reconstr_diff, axis=-1) == same_label).float())/diff_state.shape[0]
         
             total_loss = self.alpha_frob  * frob_loss/frob_loss.detach() + self.alpha_same * reconstr_same/reconstr_same.detach() +  self.alpha_diff * reconstr_diff/reconstr_diff.detach()
 
@@ -647,7 +648,7 @@ class SelfSupervisedCovIKEncoderCallback(BaseCallback):
         
         # Convert observations and actions to tensors
         observations = torch.as_tensor(observations).float().to(self.model.device)
-        actions = torch.as_tensor(actions, dtype=torch.long).to(self.model.device)[:-1]
+        actions = torch.as_tensor(actions).to(self.model.device)[:-1]
         
         # Forward pass
         with torch.set_grad_enabled(True):

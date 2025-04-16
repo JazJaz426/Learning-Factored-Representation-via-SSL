@@ -237,11 +237,13 @@ class SelfSupervisedMaskReconstrLearner(nn.Module):
         self.discriminiator = nn.Sequential(
                                 nn.Linear(2*vector_size_per_factor, 2)
         )
+        self.softmax = nn.Softmax(dim=-1)
         # self.transition_proj_ema = EMA(self.transition_proj, beta=0.999)
 
         #extra variables to reshape output
         self.num_factors = num_factors
         self.vector_size_per_factor = vector_size_per_factor
+        self.num_actions = num_actions
     
 
     def forward(self, x: torch.Tensor, actions:Optional[torch.Tensor] = None, test:bool=True)->torch.Tensor:
@@ -256,25 +258,27 @@ class SelfSupervisedMaskReconstrLearner(nn.Module):
             
         #if in train mode: used for SSL representation learning ==> then do not detach computation and return both covariance and next state prediction
         else:
-            pdb.set_trace()
             x_proj = self.act(self.factor_scale_proj(x)) #should be: (batch size, num factors*vec per factor)
-            x_curr = x_proj.reshape(x_proj.shape[0], self.num_factors, self.vector_size_per_factor) #should be: (batch size, num factors, vec per factor)
+            x_proj = x_proj.reshape(x_proj.shape[0], self.num_factors, self.vector_size_per_factor) #should be: (batch size, num factors, vec per factor)
 
             #(1) parent factor masking is close to identity and sparse
             M = torch.sigmoid(self.mask)
-            x_curr = torch.einsum('ij,bjv->biv', M, x_curr) # shape: (batch, num_factors, vec_size)
-            actions = actions.unsqueeze(1).repeat(1, self.num_factors, 1)
-            x_curr = torch.cat([x_curr, actions], dim=-1) #shape: (batch, num_factors, vec_size + num_actions)
+            x_proj = torch.einsum('ij,bjv->biv', M, x_proj) # shape: (batch, num_factors, vec_size)
+            pdb.set_trace()
+            actions = F.one_hot(actions.unsqueeze(1).repeat(1, self.num_factors), num_classes=self.num_actions)          
+            x_curr = torch.cat([x_proj[:-1], actions], dim=-1) #shape: (batch, num_factors, vec_size + num_actions)
 
             #(2) label of 1 for same state and 0 for different state
-            x_curr = x_curr[1:]
-            x_hat = self.act(self.transition_proj(x_curr))[:-1] #NOTE: use EMA model for next state prediction for slower learning
-            same_state = torch.cat([x_curr.reshape(x_curr.shape[0], self.num_factors*self.vector_size_per_factor), x_hat.reshape(x_hat.shape[0], self.num_factors*self.vector_size_per_factor)])
-            
-            perm = torch.randperm(x.shape[0])
-            x_shuffled = x_curr.index_select(0, perm).detach() #don't propagate gradients through permuted batch
-            diff_state = torch.cat([x_shuffled.reshape(x_shuffled.shape[0], self.num_factors*self.vector_size_per_factor), x_hat.reshape(x_hat.shape[0], self.num_factors*self.vector_size_per_factor)])
+            x_next = x_proj[1:]
+            x_hat = self.act(self.transition_proj(x_curr.reshape(x_curr.shape[0]*self.num_factors, self.vector_size_per_factor + self.num_actions)))
+            # x_hat = x_hat.reshape(-1, self.num_factors, self.vector_size_per_factor) #NOTE: use EMA model for next state prediction for slower learning
+            same_state = torch.cat([x_next.reshape(x_next.shape[0]*self.num_factors, self.vector_size_per_factor), x_hat], dim=1)
+            same_state = self.softmax(self.discriminiator(same_state))
 
+            perm = torch.randperm(x_next.shape[0], device=x_next.device)
+            x_shuffled = x_next.index_select(0, perm).detach() #don't propagate gradients through permuted batch
+            diff_state = torch.cat([x_shuffled.reshape(x_shuffled.shape[0]*self.num_factors, self.vector_size_per_factor), x_hat], dim=1)
+            diff_state = self.softmax(self.discriminiator(diff_state))
 
             return M, same_state, diff_state
 
