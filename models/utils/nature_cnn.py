@@ -7,7 +7,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import pdb
 from typing import Optional
-from models.learning_head.self_supervised_head import SelfSupervisedCovLearner, SelfSupervisedMaskLearner
+from models.learning_head.self_supervised_head import SelfSupervisedCovLearner, SelfSupervisedMaskLearner, SelfSupervisedCovIKLearner, SelfSupervisedMaskReconstrLearner
 from models.learning_head.supervised_head import SupervisedLearner
 
 class NatureCNN(BaseFeaturesExtractor):
@@ -32,6 +32,7 @@ class NatureCNN(BaseFeaturesExtractor):
         features_dim: int = 512,
         backbone_dim: int = 512,
         vector_size_per_factor:int = None,
+        num_actions: int=3,
         expert_obs: gym.Space= None,
         num_factors: int = None,
         normalized_image: bool = None,
@@ -76,10 +77,10 @@ class NatureCNN(BaseFeaturesExtractor):
 
         self.linear = nn.Sequential(nn.Linear(n_flatten, backbone_dim), nn.ReLU())
 
-        learning_heads = {'supervised': SupervisedLearner, 'ssl-cov':SelfSupervisedCovLearner, 'ssl-mask':SelfSupervisedMaskLearner}
-        self.learning_head = None if learning_head is None or learning_head not in learning_heads else learning_heads[learning_head](backbone_dim=backbone_dim, vector_size_per_factor=vector_size_per_factor, num_factors=output_dims if learning_head == 'supervised' else num_factors)
+        learning_heads = {'supervised': SupervisedLearner, 'ssl-cov':SelfSupervisedCovLearner, 'ssl-cov-ik':SelfSupervisedCovIKLearner, 'ssl-mask':SelfSupervisedMaskLearner, 'ssl-mask-reconstr':SelfSupervisedMaskReconstrLearner}
+        self.learning_head = None if learning_head is None or learning_head not in learning_heads else learning_heads[learning_head](backbone_dim=backbone_dim, vector_size_per_factor=vector_size_per_factor, num_factors=output_dims if learning_head == 'supervised' else num_factors, num_actions = num_actions)
 
-    def forward(self, x: th.Tensor, test:bool=True) -> th.Tensor:
+    def forward(self, x: th.Tensor, actions:th.Tensor=None, test:bool=True) -> th.Tensor:
         
         # Forward pass through the Sequential block and fully-connected layer
         x = self.cnn(x)
@@ -87,6 +88,6 @@ class NatureCNN(BaseFeaturesExtractor):
 
         #conditionally apply the learning head on the output from the FC
         if self.learning_head:
-            x = self.learning_head(x, test=test)
+            x = self.learning_head(x, actions=actions, test=test)
 
         return x

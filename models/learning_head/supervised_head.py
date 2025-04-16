@@ -6,7 +6,7 @@ from typing import Optional, List
 
 class SupervisedLearner(nn.Module):
 
-    def __init__(self, backbone_dim: int, vector_size_per_factor:int, num_factors:List[int]):
+    def __init__(self, backbone_dim: int, vector_size_per_factor:int, num_factors:List[int], num_actions:int):
         super(SupervisedLearner, self).__init__()
 
         self.expert_scale_proj = nn.Sequential(
@@ -22,7 +22,7 @@ class SupervisedLearner(nn.Module):
         self.num_dims = len(num_factors)
         self.vector_size_per_factor = vector_size_per_factor
     
-    def forward(self, x: torch.Tensor, test:bool=True)->torch.Tensor:
+    def forward(self, x: torch.Tensor, actions:Optional[torch.Tensor] = None, test:bool=True)->torch.Tensor:
         
         #if in eval mode: used for PPO policy learning => then detach computation and take argmax
         if test:

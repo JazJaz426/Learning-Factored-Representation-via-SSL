@@ -7,7 +7,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import pdb
 from typing import Optional
-from models.learning_head.self_supervised_head import SelfSupervisedCovLearner, SelfSupervisedMaskLearner
+from models.learning_head.self_supervised_head import SelfSupervisedCovLearner, SelfSupervisedMaskLearner, SelfSupervisedCovIKLearner, SelfSupervisedMaskReconstrLearner
 from models.learning_head.supervised_head import SupervisedLearner
 
 class ResidualBlock(nn.Module):
@@ -39,10 +39,12 @@ class ImpalaCNNLarge(BaseFeaturesExtractor):
         backbone_dim: int = 256,
         vector_size_per_factor:int = 3,
         expert_obs: gym.Space= None,
+        num_actions: int=3,
         num_factors: int = None,
         normalized_image: bool = False,
         learning_head:Optional[str]=None
     ) -> None:
+        pdb.set_trace()
         assert isinstance(observation_space, spaces.Box), (
             "ImpalaCNN must be used with a gym.spaces.Box ",
             f"observation space, not {observation_space}",
@@ -84,11 +86,11 @@ class ImpalaCNNLarge(BaseFeaturesExtractor):
         self.fc = nn.Linear(n_flatten, backbone_dim)
         
 
-        learning_heads = {'supervised': SupervisedLearner, 'ssl-cov':SelfSupervisedCovLearner, 'ssl-mask':SelfSupervisedMaskLearner}
-        self.learning_head = None if learning_head is None or learning_head not in learning_heads else learning_heads[learning_head](backbone_dim=backbone_dim, vector_size_per_factor=vector_size_per_factor, num_factors=output_dims if learning_head == 'supervised' else num_factors)
+        learning_heads = {'supervised': SupervisedLearner, 'ssl-cov':SelfSupervisedCovLearner, 'ssl-cov-ik':SelfSupervisedCovIKLearner, 'ssl-mask':SelfSupervisedMaskLearner, 'ssl-mask-reconst':SelfSupervisedMaskReconstrLearner}
+        self.learning_head = None if learning_head is None or learning_head not in learning_heads else learning_heads[learning_head](backbone_dim=backbone_dim, vector_size_per_factor=vector_size_per_factor, num_factors=output_dims if learning_head == 'supervised' else num_factors, num_actions = num_actions)
 
 
-    def forward(self, x:torch.Tensor, test:bool=True)->torch.Tensor:
+    def forward(self, x:torch.Tensor, actions:torch.Tensor=None, test:bool=True)->torch.Tensor:
         # Pixel normalization (/255)
         x = x / 255.0
 
@@ -100,7 +102,7 @@ class ImpalaCNNLarge(BaseFeaturesExtractor):
 
         #conditionally apply the learning head on the output from the FC
         if self.learning_head:
-            x = self.learning_head(x, test=test)
+            x = self.learning_head(x, actions=actions, test=test)
 
         return x
     
@@ -112,6 +114,7 @@ class ImpalaCNNSmall(BaseFeaturesExtractor):
         backbone_dim: int = 256,
         vector_size_per_factor:int = 3,
         expert_obs: gym.Space= None,
+        num_actions: int=3,
         num_factors:int = None,
         normalized_image: bool = False,
         learning_head:Optional[str]=None
@@ -154,12 +157,12 @@ class ImpalaCNNSmall(BaseFeaturesExtractor):
         
         self.fc = nn.Linear(n_flatten, backbone_dim)
 
-        learning_heads = {'supervised': SupervisedLearner, 'ssl-cov':SelfSupervisedCovLearner, 'ssl-mask':SelfSupervisedMaskLearner}
-        self.learning_head = None if learning_head is None or learning_head not in learning_heads else learning_heads[learning_head](backbone_dim=backbone_dim, vector_size_per_factor=vector_size_per_factor, num_factors=output_dims if learning_head == 'supervised' else num_factors)
+        learning_heads = {'supervised': SupervisedLearner, 'ssl-cov':SelfSupervisedCovLearner, 'ssl-cov-ik':SelfSupervisedCovIKLearner, 'ssl-mask':SelfSupervisedMaskLearner, 'ssl-mask-reconstr':SelfSupervisedMaskReconstrLearner}
+        self.learning_head = None if learning_head is None or learning_head not in learning_heads else learning_heads[learning_head](backbone_dim=backbone_dim, vector_size_per_factor=vector_size_per_factor, num_factors=output_dims if learning_head == 'supervised' else num_factors, num_actions = num_actions)
 
 
 
-    def forward(self, x:torch.Tensor, test:bool=True)->torch.Tensor:
+    def forward(self, x:torch.Tensor, actions:torch.Tensor=None, test:bool=True)->torch.Tensor:
         # Pixel normalization (/255)
         x = x / 255.0
         
@@ -171,6 +174,6 @@ class ImpalaCNNSmall(BaseFeaturesExtractor):
 
         #conditionally apply the learning head on the output from the FC
         if self.learning_head:
-            x = self.learning_head(x, test=test)
+            x = self.learning_head(x, actions=actions, test=test)
 
         return x

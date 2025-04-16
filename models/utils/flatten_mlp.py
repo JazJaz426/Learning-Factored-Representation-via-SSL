@@ -17,7 +17,7 @@ class FlattenMLP(BaseFeaturesExtractor):
     :param observation_space:
     """
 
-    def __init__(self, observation_space: gym.Space, features_dim:int=256, backbone_dim:int=256, expert_dim: Optional[int] = None, vector_size_per_factor:int=None, learning_head:int=None) -> None:
+    def __init__(self, observation_space: gym.Space, features_dim:int=256, backbone_dim:int=256, expert_obs: gym.Space = None, num_factors: int = None, vector_size_per_factor:int=None, learning_head:int=None) -> None:
         super().__init__(observation_space, features_dim)
         
         self.flatten = nn.Flatten()

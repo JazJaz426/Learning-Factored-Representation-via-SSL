@@ -27,7 +27,7 @@ import argparse
 import pdb
 
 
-from custom_callbacks import CustomEvalCallback, CustomVideoRecorder, RewardValueCallback, ValuePlottingCallback, SupervisedEncoderCallback, SelfSupervisedCovEncoderCallback, SelfSupervisedMaskEncoderCallback
+from custom_callbacks import CustomEvalCallback, CustomVideoRecorder, RewardValueCallback, ValuePlottingCallback, SupervisedEncoderCallback, SelfSupervisedCovEncoderCallback, SelfSupervisedCovIKEncoderCallback, SelfSupervisedMaskEncoderCallback, SelfSupervisedMaskReconstrEncoderCallback
 
 
 class PolicyHead:
@@ -139,6 +139,7 @@ class PolicyHead:
 
             #TODO: maybe make this more elegant?
             expert_obs = self.dummy_env.expert_observation_space
+            num_actions = int(self.dummy_env.action_space.n)
             
             #set the appropriate output dim
             learning_head = self.model_config['learning_head']
@@ -153,11 +154,12 @@ class PolicyHead:
             policy_kwargs = dict(
                 net_arch = dict(pi=self.model_config['ppo_policy_kwargs']['pi_dims'], vf=self.model_config['ppo_policy_kwargs']['vf_dims']),
                 features_extractor_class = ImpalaCNNSmall if len(self.parallel_train_env.observation_space.shape) > 1 else FlattenMLP,
-                features_extractor_kwargs = dict(features_dim = features_dim, backbone_dim=self.model_config['ppo_policy_kwargs']['backbone_dim'], vector_size_per_factor = self.model_config['vector_size_per_factor'], num_factors = self.model_config['num_factors'], expert_obs = expert_obs, learning_head = learning_head)
+                features_extractor_kwargs = dict(features_dim = features_dim, backbone_dim=self.model_config['ppo_policy_kwargs']['backbone_dim'], vector_size_per_factor = self.model_config['vector_size_per_factor'], num_factors = self.model_config['num_factors'], expert_obs = expert_obs, learning_head = learning_head, num_actions=num_actions)
             )
             
             #NOTE: include lr schedule if needed
-            #lr_schedule = self.linear_schedule(self.model_config['learning_rate'])   
+            #lr_schedule = self.linear_schedule(self.model_config['learning_rate'])  
+            pdb.set_trace() 
             model = PPO(
                 policy=self.policy_name,
                 env=self.parallel_train_env,
@@ -224,7 +226,7 @@ class PolicyHead:
         # VecVideoRecorder is used instead of GifLoggingCallback
         value_callback = ValuePlottingCallback(env = self.dummy_env, save_freq = self.model_config['video_log_freq']//self.model_config['num_parallel_envs'], log_dir = f"./logs/{self.algorithm}_{self.data_config['environment_name']}_policyviz/{self.data_config['observation_space']}/seed_{self.seed}/", num_envs= self.model_config['num_parallel_envs'], name_prefix = f'{self.policy_name}_policy_value')
         checkpoint_callback = CheckpointCallback(save_freq=self.model_config['save_weight_freq']//self.model_config['num_parallel_envs'], save_path=f"./logs/{self.algorithm}_{self.data_config['environment_name']}_weights/{self.data_config['observation_space']}/seed_{self.seed}/", name_prefix=f'{self.algorithm}_seed{self.seed}_step', save_replay_buffer=True)
-        
+        pdb.set_trace()
 
         # Create the callback list
         callbacks = CallbackList([reward_validation_callback, reward_eval_callback, value_callback, checkpoint_callback])
@@ -244,7 +246,14 @@ class PolicyHead:
             supervised_encoder_callback = SelfSupervisedMaskEncoderCallback(custom_name = "ssl_mask")
             callbacks.callbacks.append(supervised_encoder_callback)
         
+        if self.model_config['learning_head'] == 'ssl-mask-reconst':
+            supervised_encoder_callback = SelfSupervisedMaskReconstrEncoderCallback(custom_name="ssl_mask_reconst")
+            callbacks.callbacks.append(supervised_encoder_callback)
         
+        if self.model_config['learning_head'] == 'ssl-cov-ik':
+            supervised_encoder_callback = SelfSupervisedCovIKEncoderCallback(custom_name="ssl_covarience_ik")
+            callbacks.callbacks.append(supervised_encoder_callback)
+
 
         self.model.learn(total_timesteps=train_interval, tb_log_name=f'{self.algorithm}_{self.seed}', progress_bar = True, reset_num_timesteps=False, callback = callbacks)
 

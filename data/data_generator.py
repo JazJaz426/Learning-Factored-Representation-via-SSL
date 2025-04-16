@@ -198,6 +198,7 @@ class DataGenerator(gym.Env):
 
         #add the visual observation before augmentation for debugging
         info['original_obs'] = frame
+        info['action'] = action
         
         #apply image transformations if needed
         frame = self.data_augmentor.apply_transformation(frame)
