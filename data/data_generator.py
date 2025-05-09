@@ -4,9 +4,7 @@
 
 from minigrid.minigrid_env import MiniGridEnv
 from minigrid.core.world_object import Door, Goal, Key, Box, Ball
-from minigrid.wrappers import ImgObsWrapper
-from minigrid.wrappers import FullyObsWrapper
-from minigrid.wrappers import ActionBonus
+from minigrid.wrappers import ImgObsWrapper, FullyObsWrapper, ActionBonus, ObservationWrapper
 from gymnasium.wrappers import TimeLimit
 from collections.abc import Iterable
 import yaml
@@ -24,11 +22,31 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 from data.data_augmentor import DataAugmentor
 from data.utils.controlled_reset import CustomEnvReset
 from matplotlib import pyplot as plt
+from typing import Optional
 
 '''
 [DONE] TODO: implement (multiple) controlled environment factors at once 
     - Random bug sometimes does not allow for factored expert state to be retrieved 
 '''
+
+class FramePadder:
+    def __init__(self, target_size: Optional[list]=None):
+        assert type(target_size) is not str, f"ERROR in FramePadder __init__: target_size cannot be string type {target_size}"
+        self.target_size = tuple(target_size) if target_size else target_size
+
+    def pad(self, frame):
+        if self.target_size:
+            h, w, c = frame.shape
+            target_h, target_w = self.target_size
+            pad_top = (target_h - h) // 2
+            pad_bottom = target_h - h - pad_top
+            pad_left = (target_w - w) // 2
+            pad_right = target_w - w - pad_left
+            frame = np.pad(frame, 
+                            ((pad_top, pad_bottom), (pad_left, pad_right), (0, 0)),
+                            mode='constant', constant_values=0)
+        return frame
+
 class StochasticActionWrapper(gym.ActionWrapper):
     """
     Add stochasticity to the actions
@@ -104,12 +122,12 @@ class DataGenerator(gym.Env):
         # Reset the environment to initialize it
         self.env.reset()
         
-        #prepare the data augmentor instance 
+        #prepare the data augmentor and padding function instance 
         self.data_augmentor = DataAugmentor(configs['transformations'])
+        self.padding_func = FramePadder(configs['padded_size'])
 
         #creating the observation space and actions space
         self.action_space = self.env.action_space
-        
         self.observation_space, self.expert_observation_space = self._create_observation_space(configs['state_attribute_types'])
 
 
@@ -117,19 +135,25 @@ class DataGenerator(gym.Env):
         self.spec = self.env.spec
         self.metadata = self.env.metadata
         self.np_random = self.env.np_random
+        
 
     def _create_expert_observation_space(self, state_attribute_types):
 
         self.gym_space_params = {'boolean': (0, 1, int), 'coordinate_width': (0, self.env.grid.width, int), 'coordinate_height': (0, self.env.grid.height, int), 'agent_dir': (0, 3, int)}
 
-        relevant_state_variables = sorted(self.state_attributes)
-
+        relevant_state_variables = self.state_attributes
         min_values = np.array([]); max_values = np.array([])
 
         for var in relevant_state_variables:
-            types = state_attribute_types[var]      
+            types = state_attribute_types[var]  
 
-            if var == 'walls':
+            if var == 'wall_gaps':
+                for _ in range(4):
+                    for t in types:
+                        space_param = self.gym_space_params[t]
+                        min_values = np.append(min_values, space_param[0])
+                        max_values = np.append(max_values, space_param[1])    
+            elif var == 'walls':
                 space_param = self.gym_space_params[types[0]]
                 for _ in range(self.env.grid.width):
                     for _ in range(self.env.grid.height):
@@ -146,13 +170,13 @@ class DataGenerator(gym.Env):
         if self.normalize_state:
             min_values = (min_values - min_values)/(max_values - min_values)
             max_values = (max_values - min_values)/(max_values - min_values)
-        
         return gym.spaces.Box(low=min_values, high=max_values, dtype=int if not self.normalize_state else float)
 
     def _create_observation_space(self, state_attribute_types):
         #return the desired gym Spaces based on the observation space
         if self.observation_type == 'image':
             frame = self.env.unwrapped.get_frame(tile_size=8)
+            frame = self.padding_func.pad(frame)
             return gym.spaces.Box(low=0, high=255, shape=frame.shape, dtype=np.uint8), self._create_expert_observation_space(state_attribute_types)
 
         elif self.observation_type == 'expert':
@@ -176,6 +200,7 @@ class DataGenerator(gym.Env):
     def render(self):
         '''Implementing render() according to ABC of gymnasium env'''
         frame = self.env.unwrapped.get_frame(tile_size=8, highlight=self.highlight)
+        frame = self.padding_func.pad(frame)
         frame = self.data_augmentor.apply_transformation(frame)
         return frame
 
@@ -195,6 +220,7 @@ class DataGenerator(gym.Env):
         
 
         frame = self.env.unwrapped.get_frame(tile_size=8)
+        frame = self.padding_func.pad(frame)
 
         #add the visual observation before augmentation for debugging
         info['original_obs'] = frame
@@ -204,7 +230,6 @@ class DataGenerator(gym.Env):
         frame = self.data_augmentor.apply_transformation(frame)
         
 
-    
         state, norm_state_array = self._construct_state()
 
 
@@ -261,6 +286,7 @@ class DataGenerator(gym.Env):
         
 
         frame = self.env.unwrapped.get_frame(tile_size=8)
+        frame = self.padding_func.pad(frame)
         #add the visual observation before augmentation for debugging
         info['original_obs'] = frame
 
@@ -293,7 +319,9 @@ class DataGenerator(gym.Env):
 
     def get_curr_obs(self):
 
-        image = self.env.unwrapped.get_frame(tile_size=8)
+        frame = self.env.unwrapped.get_frame(tile_size=8)
+        frame = self.padding_func.pad(frame)
+        
         state, norm_state_array = self._construct_state()
         
 
@@ -303,7 +331,7 @@ class DataGenerator(gym.Env):
             factored = self._factorize_obs(frame)
 
 
-        obs = self._get_obs(image= image, state= norm_state_array, factored= factored)
+        obs = self._get_obs(image=frame, state= norm_state_array, factored= factored)
 
         return obs
 
@@ -323,9 +351,10 @@ class DataGenerator(gym.Env):
         types = np.array([x.type if x is not None else None for x in self.env.unwrapped.grid.grid])
         types_set = set(types)
         
-        
+        grid_width = self.env.unwrapped.width
+        grid_height = self.env.unwrapped.height
 
-        for attr in sorted(self.state_attributes):
+        for attr in self.state_attributes:
 
             if hasattr(self.env.unwrapped, attr):
                 state[attr] = getattr(self.env.unwrapped,attr)
@@ -362,15 +391,34 @@ class DataGenerator(gym.Env):
             #walls attribute for shape of grid
             elif (attr == 'walls'):
                 state[attr] = list(np.where(types=='wall', 1, 0))
+            
+            #wall gaps for the FourRooms environment
+            elif attr == 'wall_gaps':
+                gap_positions = []
+                mid_x = grid_width // 2
+                mid_y = grid_height // 2
 
-        norm_state_array = np.array([item for key in sorted(state.keys()) for item in (state[key] if isinstance(state[key], Iterable) else [state[key]])])
+                # Check along the vertical midline (x = mid_x)
+                for y in range(0, grid_height):  # Skip corners
+                    obj = self.env.unwrapped.grid.get(mid_x, y)
+                    if obj is None or isinstance(obj, Goal):
+                        gap_positions+=[mid_x, y]
+
+                # Check along the horizontal midline (y = mid_y)
+                for x in range(0, grid_width):  # Skip corners
+                    obj = self.env.unwrapped.grid.get(x, mid_y)
+                    if obj is None or isinstance(obj, Goal):
+                        gap_positions+=[x, mid_y]
+
+                state[attr] = tuple(gap_positions)
+
+        norm_state_array = np.array([item for key in state.keys() for item in (state[key] if isinstance(state[key], Iterable) else [state[key]])])
         
         #construct normalized state array output
         if self.normalize_state:
             min_values = np.array(self.expert_observation_space.low)
             max_values = np.array(self.expert_observation_space.high)
             norm_state_array = list((norm_state_array - min_values) / (max_values - min_values))
-
         return state, norm_state_array
         
 

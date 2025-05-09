@@ -4,7 +4,7 @@ some copied from EvalCallback. modified by waymao
 import os
 from stable_baselines3.common.callbacks import BaseCallback, EvalCallback, sync_envs_normalization
 from stable_baselines3.common.evaluation import evaluate_policy
-from vec_video_recorder import VecVideoRecorder
+from models.policy_head.vec_video_recorder import VecVideoRecorder
 
 import numpy as np
 from gymnasium import error, logger
@@ -18,6 +18,40 @@ import torch
 
 #NOTE: for older RewardValueCallback used as global variable building CSV
 csv_logger = pd.DataFrame(columns=['train/test', 'step', 'seed', 'cumul_reward'])
+
+
+class InitializeLogsCallback(BaseCallback):
+    def __init__(self, verbose=0, max_steps=100):
+        super(InitializeLogsCallback, self).__init__(verbose)
+        self.max_steps = max_steps
+    
+    def _on_step(self):
+        return True
+
+    def _on_training_start(self) -> None:
+        #NOTE: used to align the rollout ep_rew_mean, ep_len_mean and success_rate plots s.t. they start from 0.0
+        self.logger.record("rollout/ep_rew_mean", 0.0)
+        self.logger.record("rollout/ep_len_mean", self.max_steps)
+        self.logger.record("time/fps", 0.0)
+        self.logger.record("time/time_elapsed", 0, exclude="tensorboard")
+        self.logger.record("time/total_timesteps", 0.0, exclude="tensorboard")
+        self.logger.record("rollout/success_rate", 0.0)
+        self.logger.dump(step=0)
+
+class AdvantageLoggerCallback(BaseCallback):
+    def __init__(self, verbose=0):
+        super(AdvantageLoggerCallback, self).__init__(verbose)
+    
+    def _on_step(self):
+        return True
+        
+    def _on_rollout_end(self):
+        advantages = self.model.rollout_buffer.advantages
+        mean_adv = advantages.mean()
+        std_adv = advantages.std()
+        
+        self.logger.record("advantage/adv_mean", mean_adv)
+        self.logger.record("advantage/adv_std", std_adv)
 
 class CustomVideoRecorder(VecVideoRecorder):
 
@@ -73,10 +107,11 @@ class CustomEvalCallback(EvalCallback):
     Custom Evaluation Callback for Stable Baselines that supports custom
     name for logging.
     """
-    def __init__(self, custom_name, eval_env, gamma=None, *args, **kwargs):
+    def __init__(self, custom_name, eval_env, max_steps = 100, gamma=None, *args, **kwargs):
         #TODO: chekc kwargs input into model, correctly passed to super() EvalCallback
         self.custom_name = custom_name
         self.gamma = gamma
+        self.max_steps = max_steps
         super(CustomEvalCallback, self).__init__(eval_env, *args, **kwargs)
 
         self.mean_evaluations_results = []
@@ -84,13 +119,29 @@ class CustomEvalCallback(EvalCallback):
         self.mean_evaluations_length = []
         self.std_evaluations_length = []
 
+    def _on_training_start(self) -> None:
+        # Force log at step 0
+        self.logger.record(f"eval/{self.custom_name}/mean_reward", 0.0)
+        self.logger.record(f"eval/{self.custom_name}/std_reward", 0.0)
+        self.logger.record(f"eval/{self.custom_name}/mean_ep_length", self.max_steps)
+        self.logger.record(f"eval/{self.custom_name}/std_ep_length", 0.0)
+        self.logger.record(f"eval/{self.custom_name}/success_rate", 0.0)
+        self.logger.record(f"time/{self.custom_name}/total_timesteps", 0)
+        self.logger.dump(0)
+        
     def _on_step(self) -> bool:
         # NOTE: this function is identical to the original _on_step function
         # but with the addition of the custom name for logging
         continue_training = True
 
+
+
         #[SR] divided by self.eval_env.num_envs for periodic logging
         if self.eval_freq > 0 and (self.n_calls % (self.eval_freq // self.eval_env.num_envs))== 0:
+            
+            #NOTE:reseed the vecenv environment for better variance when running custom evaluations
+            random_seed = np.random.randint(0, 1000000)
+            self.eval_env.env_method("reset", seed=random_seed)
             
             # Sync training and eval env if there is VecNormalize
             if self.model.get_vec_normalize_env() is not None:
@@ -228,8 +279,18 @@ class ValuePlottingCallback(BaseCallback):
         
         original_obs, info = self.base_env.reset()
 
-        value_function = np.zeros((self.base_env.env.env.unwrapped.width, self.base_env.env.env.unwrapped.height)) * np.nan
+        width = self.base_env.env.env.unwrapped.width
+        height = self.base_env.env.env.unwrapped.height
 
+        # Detect the rendered observation shape
+        obs_img = info['obs']  # This should be the RGB image (H, W, C)
+        img_height, img_width = obs_img.shape[:2]
+
+        # Compute the scaling factor: how many pixels per grid cell?
+        scale_x = img_width / width
+        scale_y = img_height / height
+
+        value_function = np.full((width, height), np.nan)
 
         for w in range(self.base_env.env.env.unwrapped.width):
             for h in range(self.base_env.env.env.unwrapped.height):
@@ -267,8 +328,8 @@ class ValuePlottingCallback(BaseCallback):
         #plotting value function over the observation
         fig = plt.figure(frameon=False)
         plt.imshow(info['obs'])
-        plot_extent = [0, self.base_env.env.env.unwrapped.width * 8, self.base_env.env.env.unwrapped.height * 8, 0]
-        plt.imshow(value_function, alpha=0.5, cmap='viridis', extent = plot_extent)
+        plot_extent = [0, width * scale_x, height * scale_y, 0]
+        plt.imshow(value_function.T, alpha=0.5, cmap='viridis', extent = plot_extent)
         plt.colorbar()
         plt.title(f"Value Function @ Step {self.num_timesteps}")
 
@@ -648,7 +709,7 @@ class SelfSupervisedCovIKEncoderCallback(BaseCallback):
         
         # Convert observations and actions to tensors
         observations = torch.as_tensor(observations).float().to(self.model.device)
-        actions = torch.as_tensor(actions).to(self.model.device)[:-1]
+        actions = torch.as_tensor(actions, dtype=torch.long).to(self.model.device)[:-1]
         
         # Forward pass
         with torch.set_grad_enabled(True):
@@ -884,12 +945,11 @@ class SupervisedEncoderCallback(BaseCallback):
             loss = 0
             accuracy = 0
 
-            # Get predicted class indices
-            preds = torch.argmax(pred_features, dim=1)
-
             for i, feat in enumerate(pred_features):
                 loss += self.loss_fn(feat, labels[:,i])
-                accuracy += (preds == labels).float().mean()
+                # Get predicted class indices
+                preds = torch.argmax(feat, dim=1)
+                accuracy += (preds == labels[:,i]).float().mean()
             loss /= (len(pred_features))
             accuracy /= (len(pred_features))
         

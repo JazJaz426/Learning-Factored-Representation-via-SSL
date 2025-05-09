@@ -44,7 +44,6 @@ class ImpalaCNNLarge(BaseFeaturesExtractor):
         normalized_image: bool = False,
         learning_head:Optional[str]=None
     ) -> None:
-        pdb.set_trace()
         assert isinstance(observation_space, spaces.Box), (
             "ImpalaCNN must be used with a gym.spaces.Box ",
             f"observation space, not {observation_space}",

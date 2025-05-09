@@ -28,9 +28,9 @@ class SupervisedLearner(nn.Module):
         if test:
             x = self.expert_scale_proj(x)
             x = x.reshape(x.shape[0], self.num_dims, self.vector_size_per_factor)
-            x = [torch.argmax(self.softmax(fc_proj(x[:,i,:])).detach(), dim=-1) for i, fc_proj in enumerate(self.expert_distribution_proj)] #list of length expert_dim: every entry is (batch_size) tensor
-            x = torch.stack(x, dim=0).T #NOTE: hopefully a (batch size, expert_dim) tensor
-            x = x.float() #convert to float for loss and forward pass
+            #x = [torch.argmax(self.softmax(fc_proj(x[:,i,:])).detach(), dim=-1) for i, fc_proj in enumerate(self.expert_distribution_proj)] #list of length expert_dim: every entry is (batch_size) tensor
+            #x = torch.stack(x, dim=0).T #NOTE: hopefully a (batch size, expert_dim) tensor
+            #x = x.float() #convert to float for loss and forward pass
         #if in train mode: used for SL representation learning  ==> then do not detach computation and do not take argmax
         else:
             x = self.expert_scale_proj(x)

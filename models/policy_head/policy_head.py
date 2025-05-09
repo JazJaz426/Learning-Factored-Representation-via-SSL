@@ -27,7 +27,7 @@ import argparse
 import pdb
 
 
-from custom_callbacks import CustomEvalCallback, CustomVideoRecorder, RewardValueCallback, ValuePlottingCallback, SupervisedEncoderCallback, SelfSupervisedCovEncoderCallback, SelfSupervisedCovIKEncoderCallback, SelfSupervisedMaskEncoderCallback, SelfSupervisedMaskReconstrEncoderCallback
+from models.policy_head.custom_callbacks import CustomEvalCallback, CustomVideoRecorder, RewardValueCallback, ValuePlottingCallback, SupervisedEncoderCallback, SelfSupervisedCovEncoderCallback, SelfSupervisedCovIKEncoderCallback, SelfSupervisedMaskEncoderCallback, SelfSupervisedMaskReconstrEncoderCallback, AdvantageLoggerCallback, InitializeLogsCallback
 
 
 class PolicyHead:
@@ -52,7 +52,7 @@ class PolicyHead:
 
         self.parallel_train_env = VecVideoRecorder(
             self.create_parallel_envs(seed = self.seed),
-            f"./logs/{self.algorithm}_{self.data_config['environment_name']}_policyviz/{self.data_config['observation_space']}/seed_{self.seed}/", 
+            f"./logs/{self.algorithm}_{self.data_config['environment_name']}_policyviz/{self.model_config['learning_head']}_{self.data_config['observation_space']}/seed_{self.seed}/", 
             record_video_trigger=lambda x: x % (self.model_config['video_log_freq'] // self.model_config['num_parallel_envs']) == 0, 
             video_length=self.model_config['video_length'], 
             name_prefix=self.policy_name
@@ -159,12 +159,11 @@ class PolicyHead:
             
             #NOTE: include lr schedule if needed
             #lr_schedule = self.linear_schedule(self.model_config['learning_rate'])  
-            pdb.set_trace() 
             model = PPO(
                 policy=self.policy_name,
                 env=self.parallel_train_env,
                 seed=seed,
-                tensorboard_log=f"./logs/{self.algorithm}_{self.data_config['environment_name']}_tensorboard/{self.data_config['observation_space']}/seed_{seed}/",
+                tensorboard_log=f"./logs/{self.algorithm}_{self.data_config['environment_name']}_tensorboard/{self.model_config['learning_head']}_{self.data_config['observation_space']}/seed_{seed}/",
                 policy_kwargs = policy_kwargs,
                 **ppo_params,
             )
@@ -175,7 +174,7 @@ class PolicyHead:
                 env=self.parallel_train_env,
                 seed=seed,
                 **dqn_params,
-                tensorboard_log=f"./logs/{self.algorithm}_{self.data_config['environment_name']}_tensorboard/{self.data_config['observation_space']}/seed_{seed}/"
+                tensorboard_log=f"./logs/{self.algorithm}_{self.data_config['environment_name']}_tensorboard/{self.model_config['learning_head']}_{self.data_config['observation_space']}/seed_{seed}/"
             )
         elif self.algorithm == "A2C":
             a2c_params = {k: v for k, v in self.model_config['a2c'].items() if v is not None}
@@ -184,7 +183,7 @@ class PolicyHead:
                 env=self.parallel_train_env,
                 seed=seed,
                 **a2c_params,
-                tensorboard_log=f"./logs/{self.algorithm}_{self.data_config['environment_name']}_tensorboard/{self.data_config['observation_space']}/seed_{seed}/"
+                tensorboard_log=f"./logs/{self.algorithm}_{self.data_config['environment_name']}_tensorboard/{self.model_config['learning_head']}_{self.data_config['observation_space']}/seed_{seed}/"
             )
         else:
             raise ValueError(f"Unsupported RL algorithm: {self.algorithm}")
@@ -193,7 +192,7 @@ class PolicyHead:
 
     def train_and_evaluate_policy(self):
         wandb.init(
-            project='disentangled_rep',
+            project='disentangled_representations',
             entity='ssl-factored-reps', 
             name=f'{self.algorithm}_{self.data_config["environment_name"]}_{self.data_config["observation_space"]}_seed_{self.seed}',
             group=f'{self.algorithm}_{self.data_config["environment_name"]}_{self.data_config["observation_space"]}',
@@ -208,11 +207,11 @@ class PolicyHead:
         )
         train_interval = self.model_config['train_interval']
 
-        if os.path.exists(f"./logs/{self.algorithm}_{self.data_config['environment_name']}_weights/{self.data_config['observation_space']}/seed_{self.seed}") and len(os.listdir(f"./logs/{self.algorithm}_{self.data_config['environment_name']}_weights/{self.data_config['observation_space']}/seed_{self.seed}")) > 0:
+        if os.path.exists(f"./logs/{self.algorithm}_{self.data_config['environment_name']}_weights/{self.model_config['learning_head']}_{self.data_config['observation_space']}/seed_{self.seed}") and len(os.listdir(f"./logs/{self.algorithm}_{self.data_config['environment_name']}_weights/{self.model_config['learning_head']}_{self.data_config['observation_space']}/seed_{self.seed}")) > 0:
             try:
                 #fetch the best weights for the model rather than latest
-                best_weight = os.listdir(f"./logs/{self.algorithm}_{self.data_config['environment_name']}_weights/{self.data_config['observation_space']}/seed_{self.seed}/best_weight")[0].split('.')[0]
-                final_path = os.path.join(f"./logs/{self.algorithm}_{self.data_config['environment_name']}_weights/{self.data_config['observation_space']}/seed_{self.seed}/best_weight", best_weight)
+                best_weight = os.listdir(f"./logs/{self.algorithm}_{self.data_config['environment_name']}_weights/{self.model_config['learning_head']}_{self.data_config['observation_space']}/seed_{self.seed}/best_weight")[0].split('.')[0]
+                final_path = os.path.join(f"./logs/{self.algorithm}_{self.data_config['environment_name']}_weights/{self.model_config['learning_head']}_{self.data_config['observation_space']}/seed_{self.seed}/best_weight", best_weight)
 
                 self.model.load(path = final_path, env = self.parallel_train_env)
             except:
@@ -220,16 +219,19 @@ class PolicyHead:
 
             
         # Use Built-in Eval Callback to support multiple parallel environments
-        reward_validation_callback = CustomEvalCallback("validation", eval_env=self.valid_env, n_eval_episodes=self.model_config['num_eval_eps'], eval_freq=self.model_config['reward_log_freq'], deterministic = True, log_path = f"./logs/{self.algorithm}_{self.data_config['environment_name']}_tensorboard/{self.data_config['observation_space']}/seed_{self.seed}/", best_model_save_path = f"./logs/{self.algorithm}_{self.data_config['environment_name']}_weights/{self.data_config['observation_space']}/seed_{self.seed}/best_weight")
-        reward_eval_callback = CustomEvalCallback("eval", eval_env=self.eval_env, n_eval_episodes=self.model_config['num_eval_eps'], eval_freq=self.model_config['reward_log_freq'], deterministic = True, log_path = f"./logs/{self.algorithm}_{self.data_config['environment_name']}_tensorboard/{self.data_config['observation_space']}/seed_{self.seed}/", best_model_save_path = None)
+        reward_validation_callback = CustomEvalCallback("validation", eval_env=self.valid_env, max_steps=self.data_config['max_steps'], n_eval_episodes=self.model_config['num_eval_eps'], eval_freq=self.model_config['reward_log_freq'], deterministic = True, log_path = f"./logs/{self.algorithm}_{self.data_config['environment_name']}_tensorboard/{self.model_config['learning_head']}_{self.data_config['observation_space']}/seed_{self.seed}/", best_model_save_path = f"./logs/{self.algorithm}_{self.data_config['environment_name']}_weights/{self.model_config['learning_head']}_{self.data_config['observation_space']}/seed_{self.seed}/best_weight")
+        # reward_eval_callback = CustomEvalCallback("eval", eval_env=self.eval_env, max_steps=self.data_config['max_steps'], n_eval_episodes=self.model_config['num_eval_eps'], eval_freq=self.model_config['reward_log_freq'], deterministic = True, log_path = f"./logs/{self.algorithm}_{self.data_config['environment_name']}_tensorboard/{self.model_config['learning_head']}_{self.data_config['observation_space']}/seed_{self.seed}/", best_model_save_path = None)
        
         # VecVideoRecorder is used instead of GifLoggingCallback
-        value_callback = ValuePlottingCallback(env = self.dummy_env, save_freq = self.model_config['video_log_freq']//self.model_config['num_parallel_envs'], log_dir = f"./logs/{self.algorithm}_{self.data_config['environment_name']}_policyviz/{self.data_config['observation_space']}/seed_{self.seed}/", num_envs= self.model_config['num_parallel_envs'], name_prefix = f'{self.policy_name}_policy_value')
-        checkpoint_callback = CheckpointCallback(save_freq=self.model_config['save_weight_freq']//self.model_config['num_parallel_envs'], save_path=f"./logs/{self.algorithm}_{self.data_config['environment_name']}_weights/{self.data_config['observation_space']}/seed_{self.seed}/", name_prefix=f'{self.algorithm}_seed{self.seed}_step', save_replay_buffer=True)
-        pdb.set_trace()
+        value_callback = ValuePlottingCallback(env = self.dummy_env, save_freq = self.model_config['video_log_freq']//self.model_config['num_parallel_envs'], log_dir = f"./logs/{self.algorithm}_{self.data_config['environment_name']}_policyviz/{self.model_config['learning_head']}_{self.data_config['observation_space']}/seed_{self.seed}/", num_envs= self.model_config['num_parallel_envs'], name_prefix = f'{self.policy_name}_policy_value')
+        checkpoint_callback = CheckpointCallback(save_freq=self.model_config['save_weight_freq']//self.model_config['num_parallel_envs'], save_path=f"./logs/{self.algorithm}_{self.data_config['environment_name']}_weights/{self.model_config['learning_head']}_{self.data_config['observation_space']}/seed_{self.seed}/", name_prefix=f'{self.algorithm}_seed{self.seed}_step', save_replay_buffer=True)
+
+        #Advantage Plotting and Initialization callbacks
+        adv_callback = AdvantageLoggerCallback(verbose=1)
+        init_callback = InitializeLogsCallback(max_steps=self.data_config['max_steps'])
 
         # Create the callback list
-        callbacks = CallbackList([reward_validation_callback, reward_eval_callback, value_callback, checkpoint_callback])
+        callbacks = CallbackList([reward_validation_callback, value_callback, checkpoint_callback, adv_callback, init_callback])
         
         #If using supervised learning or our approach, create separate SupervisedEncoderCallback for supervised learning approach
         if self.model_config['learning_head'] == 'supervised':
@@ -260,33 +262,7 @@ class PolicyHead:
         if self.model_config['wandb_log']:
             wandb.finish()
     
-    def evaluate_policy(self, min_seed:int, max_seed:int, transform_obs:bool, transform_func):
-        
-        #collect all rewards and dones
-        tot_rewards = []
-        tot_steps = []
-        tot_dones = []
-        
-        #iterate through all seeds and evaluate policy
-        assert max_seed >= min_seed, 'ERROR: the max_seed needs to be > min_seed'
-
-        for seed in range(min_seed, max_seed+1):
-            self.valid_env = self.create_parallel_envs(seed = seed)
-            obs = self.valid_env.reset()
-            for i in range(self.data_config['max_steps']):
-                action, _states = model.predict(obs, deterministic=True)
-                obs, rewards, dones, info = vec_env.step(action)
-
-                tot_rewards.append(sum(rewards))
-                tot_dones.append(sum(dones))
-
-                if dones:
-                    break
-            
-            tot_steps.append(i)
-            
-        return np.mean(tot_rewards), np.std(tot_rewards), np.mean(tot_dones), np.std(tot_dones), np.mean(tot_steps), np.std(tot_steps)
-        
+    
 
 if __name__ == '__main__':
     args = argparse.ArgumentParser()

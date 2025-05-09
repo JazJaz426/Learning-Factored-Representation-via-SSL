@@ -68,7 +68,6 @@ class SelfSupervisedCovIKLearner(nn.Module):
             
         #if in train mode: used for SSL representation learning ==> then do not detach computation and return both covariance and next state prediction
         else:
-            pdb.set_trace()
             x_proj = self.act(self.factor_scale_proj(x)) #should be: (batch size, num factors*vector_size_per_factor)
 
             # Compute the mean of each feature
@@ -264,7 +263,6 @@ class SelfSupervisedMaskReconstrLearner(nn.Module):
             #(1) parent factor masking is close to identity and sparse
             M = torch.sigmoid(self.mask)
             x_proj = torch.einsum('ij,bjv->biv', M, x_proj) # shape: (batch, num_factors, vec_size)
-            pdb.set_trace()
             actions = F.one_hot(actions.unsqueeze(1).repeat(1, self.num_factors), num_classes=self.num_actions)          
             x_curr = torch.cat([x_proj[:-1], actions], dim=-1) #shape: (batch, num_factors, vec_size + num_actions)
 
