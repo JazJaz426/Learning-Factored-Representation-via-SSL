@@ -23,6 +23,9 @@ from data.data_augmentor import DataAugmentor
 from data.utils.controlled_reset import CustomEnvReset
 from matplotlib import pyplot as plt
 from typing import Optional
+# from custom_env.blockeddoorkey import BlockedDoorKeyEnv
+from gymnasium.envs.registration import register
+
 
 '''
 [DONE] TODO: implement (multiple) controlled environment factors at once 
@@ -78,6 +81,23 @@ class DataGenerator(gym.Env):
     def __init__(self, config_filename='config.yaml'):
 
         super(DataGenerator, self).__init__()
+
+        #register BlockedDoorKey to the environment list
+        register(
+            id="MiniGrid-BlockedDoorKey-6x6",
+            entry_point="custom_env.blockeddoorkey:BlockedDoorKeyEnv",
+            kwargs={"size": 6},
+        )
+        register(
+            id="MiniGrid-BlockedDoorKey-8x8",
+            entry_point="custom_env.blockeddoorkey:BlockedDoorKeyEnv",
+            kwargs={"size": 8},
+        )
+        register(
+            id="MiniGrid-BlockedDoorKey-16x16",
+            entry_point="custom_env.blockeddoorkey:BlockedDoorKeyEnv",
+            kwargs={"size": 16},
+        )
 
         # Parse yaml file parameters for data generator
         try:

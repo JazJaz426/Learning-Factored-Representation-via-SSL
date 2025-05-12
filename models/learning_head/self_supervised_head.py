@@ -65,7 +65,7 @@ class SelfSupervisedCovIKLearner(nn.Module):
 
             return x
 
-            
+        
         #if in train mode: used for SSL representation learning ==> then do not detach computation and return both covariance and next state prediction
         else:
             x_proj = self.act(self.factor_scale_proj(x)) #should be: (batch size, num factors*vector_size_per_factor)
@@ -83,14 +83,14 @@ class SelfSupervisedCovIKLearner(nn.Module):
             x_proj = x_proj.reshape(x_proj.shape[0], self.num_factors, self.vector_size_per_factor)
             pred_action = []
             for i, f in enumerate(range(self.num_factors)):
-                ik_input = torch.cat([x_proj[1:,f,:], x_proj[:-1,f,:]], dim=-1) #shape: (batch, 1, 2*vec size per factor)
+                ik_input = torch.cat([x_proj[:-1,f,:], x_proj[1:,f,:]], dim=-1) #shape: (batch, 1, 2*vec size per factor)
                 pred_action.append(self.softmax(self.ik_proj[i](ik_input)))#shape: [(batch, 1, action_dim)...]
             
             pred_action = torch.stack(pred_action, dim=1) #shape: (batch, factors, action_dim)
         
             #(3) Factor-specific smoothness in predictions
             thresholded_diff = torch.norm(x_proj[:-1,:,:] - x_proj[1:,:,:], p=2, dim=-1) - self.smoothness_margin
-            thresholded_diff = self.act(thresholded_diff)**2
+            thresholded_diff = self.act(thresholded_diff)
             
             return batch_cov, pred_action, thresholded_diff
 
