@@ -268,7 +268,7 @@ class SelfSupervisedMaskReconstrLearner(nn.Module):
 
             #(2) label of 1 for same state and 0 for different state
             x_next = x_proj[1:]
-            x_hat = self.act(self.transition_proj(x_curr.reshape(x_curr.shape[0]*self.num_factors, self.vector_size_per_factor + self.num_actions)))
+            x_hat = self.transition_proj(x_curr.reshape(x_curr.shape[0]*self.num_factors, self.vector_size_per_factor + self.num_actions))
             # x_hat = x_hat.reshape(-1, self.num_factors, self.vector_size_per_factor) #NOTE: use EMA model for next state prediction for slower learning
             same_state = torch.cat([x_next.reshape(x_next.shape[0]*self.num_factors, self.vector_size_per_factor), x_hat], dim=1)
             same_state = self.softmax(self.discriminiator(same_state))

@@ -7,6 +7,7 @@ from stable_baselines3.common.monitor import Monitor
 from stable_baselines3.common.torch_layers import NatureCNN, FlattenExtractor
 from models.utils.impala_cnn import ImpalaCNNLarge, ImpalaCNNSmall
 from models.utils.flatten_mlp import FlattenMLP
+from detached_actor_critic import DetatchedActorCriticPolicy
 from stable_baselines3.common.vec_env import SubprocVecEnv, VecTransposeImage
 import numpy as np
 
@@ -101,9 +102,11 @@ class PolicyHead:
             return yaml.safe_load(file)
 
     def select_policy(self):
-        if self.data_type == "image":
+        if self.model_config['learning_head'] == "supervised" or self.model_config['learning_head'].startswith('ssl'):
+            return DetatchedActorCriticPolicy
+        elif self.data_type == "image":
             return "CnnPolicy"
-        elif self.data_type in ["factored", "expert"]:
+        elif self.data_type == "expert":
             return "MlpPolicy"
         else:
             raise ValueError(f"Unsupported data type: {self.data_type}")
@@ -154,7 +157,10 @@ class PolicyHead:
             policy_kwargs = dict(
                 net_arch = dict(pi=self.model_config['ppo_policy_kwargs']['pi_dims'], vf=self.model_config['ppo_policy_kwargs']['vf_dims']),
                 features_extractor_class = ImpalaCNNSmall if len(self.parallel_train_env.observation_space.shape) > 1 else FlattenMLP,
-                features_extractor_kwargs = dict(features_dim = features_dim, backbone_dim=self.model_config['ppo_policy_kwargs']['backbone_dim'], vector_size_per_factor = self.model_config['vector_size_per_factor'], num_factors = self.model_config['num_factors'], expert_obs = expert_obs, learning_head = learning_head, num_actions=num_actions)
+                features_extractor_kwargs = dict(features_dim = features_dim, backbone_dim=self.model_config['ppo_policy_kwargs']['backbone_dim'], 
+                vector_size_per_factor = self.model_config['vector_size_per_factor'], num_factors = self.model_config['num_factors'], 
+                expert_obs = expert_obs, learning_head = learning_head, num_actions=num_actions),
+                shared_feature_extractor = True
             )
             
             #NOTE: include lr schedule if needed

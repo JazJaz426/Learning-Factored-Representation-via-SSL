@@ -85,17 +85,17 @@ class DataGenerator(gym.Env):
         #register BlockedDoorKey to the environment list
         register(
             id="MiniGrid-BlockedDoorKey-6x6",
-            entry_point="custom_env.blockeddoorkey:BlockedDoorKeyEnv",
+            entry_point="data.custom_env.blockeddoorkey:BlockedDoorKeyEnv",
             kwargs={"size": 6},
         )
         register(
             id="MiniGrid-BlockedDoorKey-8x8",
-            entry_point="custom_env.blockeddoorkey:BlockedDoorKeyEnv",
+            entry_point="data.custom_env.blockeddoorkey:BlockedDoorKeyEnv",
             kwargs={"size": 8},
         )
         register(
             id="MiniGrid-BlockedDoorKey-16x16",
-            entry_point="custom_env.blockeddoorkey:BlockedDoorKeyEnv",
+            entry_point="data.custom_env.blockeddoorkey:BlockedDoorKeyEnv",
             kwargs={"size": 16},
         )
 
